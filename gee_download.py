@@ -63,6 +63,9 @@ def get_gee_data(
         opt_url='https://earthengine-highvolume.googleapis.com'
     )
     for gee_date in daily_date_dict[year]:
+        daily_csv = f'{output_dir}Daily_GEE_{gee_date}.csv'
+        if os.path.exists(daily_csv):
+            continue
         year, month, day = gee_date.split('-')
         year = int(year)
         month = int(month)
@@ -160,7 +163,7 @@ def get_gee_data(
                 cols = df.columns.tolist()
                 cols = ['Date'] + [col for col in cols if col != 'Date']
                 df = df[cols]
-                df.to_csv(f'{output_dir}Daily_GEE_{gee_date}.csv', index=False)
+                df.to_csv(daily_csv, index=False)
                 retry_download = False
             except (
                 ee.EEException, requests.exceptions.RequestException,
@@ -172,6 +175,9 @@ def get_gee_data(
             time.sleep(0.001)
 
     for month_yr in monthly_date_dict[year]:
+        monthly_csv = f'{output_dir}Monthly_GRACE_{month_yr}.csv'
+        if os.path.exists(monthly_csv):
+            continue
         year, month = month_yr.split('-')
         year = int(year)
         month = int(month)
@@ -211,10 +217,11 @@ def get_gee_data(
                     cols = df.columns.tolist()
                     cols = ['Date'] + [col for col in cols if col != 'Date']
                     df = df[cols]
-                    df.to_csv(f'{output_dir}Monthly_GRACE_{month_yr}.csv', index=False)
+                    df.to_csv(monthly_csv, index=False)
                     retry_download = False
                 except (
                         ee.EEException, requests.exceptions.RequestException,
+                        requests.exceptions.Timeout,
                         requests.exceptions.ConnectionError, RemoteDisconnected,
                 ) as e:
                     print('Error', e, 'during download!')
