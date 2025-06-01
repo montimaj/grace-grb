@@ -25,7 +25,8 @@ def get_gee_data(
         output_dir: str,
         gldas_ic: ee.ImageCollection,
         era5land_ic: ee.ImageCollection,
-        grace_ic: ee.ImageCollection
+        grace_ic: ee.ImageCollection,
+        gldas_version: str = 'V022'
 ) -> None:
     """
     Downloads daily GEE and monthly GRACE data from Google Earth Engine for a given year and saves it to CSV files.
@@ -39,26 +40,12 @@ def get_gee_data(
         gldas_ic: GLDAS ImageCollection.
         era5land_ic: ERA5-Land ImageCollection.
         grace_ic: GRACE ImageCollection.
+        gldas_version: Version of the GLDAS dataset to use (default is 'V022'). Supported versions are 'V021' and 'V022'.
 
     Returns:
         None
     """
-    data_band_names = [
-        'rzsm_gldas_mm',
-        'ssm_gldas_mm',
-        'et_gldas_mm'
-        'tws_gldas_mm',
-        'ppt_era5_mm',
-        'runoff_era5_mm',
-        'tmax_era5_degC',
-        'tmin_era5_degC'
-    ]
-    sum_data_band_names = [
-        'et_gldas_mm',
-        'tws_gldas_mm',
-        'ppt_era5_mm',
-        'runoff_era5_mm',
-    ]
+
     ee.Initialize(
         project='grace-grb',
         opt_url='https://earthengine-highvolume.googleapis.com'
@@ -76,22 +63,29 @@ def get_gee_data(
             gee_date_adv = f'{year + 1}-01-01' if month + 1 > 12 else f'{year}-{month + 1:02d}-01'
         else:
             gee_date_adv = f'{year}-{month:02d}-{day + 1:02d}'
+        gldas_bands = {
+            'V022': ['SoilMoist_RZ_tavg', 'SoilMoist_S_tavg', 'Evap_tavg'],
+            'V021': ['RootMoist_inst', 'SoilMoi0_10cm_inst', 'Evap_tavg']
+        }
         rzsm_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
-            .select('SoilMoist_RZ_tavg') \
+            .select(gldas_bands[gldas_version][0]) \
             .mean() \
             .rename('rzsm_gldas_mm')
         ssm_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
-            .select('SoilMoist_S_tavg') \
+            .select(gldas_bands[gldas_version][1]) \
             .mean() \
             .rename('ssm_gldas_mm')
         et_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
-            .select('Evap_tavg') \
-            .mean() \
+            .select(gldas_bands[gldas_version][2]) \
+            .sum() \
             .rename('et_gldas_mm')
-        tws_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
-            .select('TWS_tavg') \
-            .mean() \
-            .rename('tws_gldas_mm')
+        if gldas_version == 'V022':
+            tws_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
+                .select('TWS_tavg') \
+                .sum() \
+                .rename('tws_gldas_mm')
+        else:
+            tws_gldas = None
         ppt_era5 = era5land_ic.filterDate(gee_date, gee_date_adv) \
             .select('total_precipitation_sum') \
             .mean() \
@@ -112,19 +106,33 @@ def get_gee_data(
             .mean() \
             .add(-273.15) \
             .rename('tmin_era5_degC')
-        data_bands = [
+        tws_gldas_band = [] if tws_gldas is None else [tws_gldas]
+        tws_gldas_band_name = [] if tws_gldas is None else ['tws_gldas_mm']
+        data_band_names = tws_gldas_band_name + [
+            'rzsm_gldas_mm',
+            'ssm_gldas_mm',
+            'et_gldas_mm',
+            'ppt_era5_mm',
+            'runoff_era5_mm',
+            'tmax_era5_degC',
+            'tmin_era5_degC'
+        ]
+        sum_data_band_names = tws_gldas_band_name + [
+            'et_gldas_mm',
+            'ppt_era5_mm',
+            'runoff_era5_mm',
+        ]
+        data_bands = tws_gldas_band + [
             rzsm_gldas,
             ssm_gldas,
             et_gldas,
-            tws_gldas,
             ppt_era5,
             runoff_era5,
             tmax_era5,
             tmin_era5
         ]
-        sum_data_bands = [
+        sum_data_bands = tws_gldas_band + [
             et_gldas,
-            tws_gldas,
             ppt_era5,
             runoff_era5,
         ]
@@ -242,7 +250,8 @@ def gee_data_download(
         input_vector_path: str,
         start_year: int,
         end_year: int,
-        output_dir: str
+        output_dir: str,
+        gldas_version: str = 'V022',
 ) -> None:
     """
     Downloads data from Google Earth Engine based on the input GeoDataFrame.
@@ -252,6 +261,7 @@ def gee_data_download(
         start_year: The starting year for the data download.
         end_year: The ending year for the data download.
         output_dir: Directory where the downloaded data will be saved.
+        gldas_version: Version of the GLDAS dataset to use (default is 'V022'). Supported versions are 'V021' and 'V022'.
     """
     try:
         input_gdf = gpd.read_file(input_vector_path)
@@ -264,14 +274,14 @@ def gee_data_download(
         gdf = input_gdf.to_crs("EPSG:4326")
         geo_json = gdf.to_json()
         fc = ee.FeatureCollection(json.loads(geo_json))
-        temp_dir = f'{output_dir}temp/'
+        temp_dir = f'{output_dir}temp/GLDAS_{gldas_version}/'
         os.makedirs(temp_dir, exist_ok=True)
-
         # download daily GEE data
         grace_ic = ee.ImageCollection('NASA/GRACE/MASS_GRIDS_V04/MASCON_CRI')
         era5land_ic = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
-        gldas_ic = ee.ImageCollection('NASA/GLDAS/V022/CLSM/G025/DA1D')
-
+        gldas_v22_ic = ee.ImageCollection('NASA/GLDAS/V022/CLSM/G025/DA1D')
+        gldas_v21_ic = ee.ImageCollection('NASA/GLDAS/V021/NOAH/G025/T3H')
+        gldas_ic = gldas_v22_ic if gldas_version == 'V022' else gldas_v21_ic
         daily_date_dict = {}
         monthly_date_dict = {}
         for year in year_list:
@@ -298,7 +308,8 @@ def gee_data_download(
                 temp_dir,
                 gldas_ic,
                 era5land_ic,
-                grace_ic
+                grace_ic,
+                gldas_version
             ) for year in year_list
         )
         daily_gee_df = pd.concat(
@@ -307,8 +318,8 @@ def gee_data_download(
         monthly_grace_df = pd.concat(
             [pd.read_csv(monthly_csv) for monthly_csv in glob(f'{temp_dir}Monthly_GRACE_*.csv')]
         ).sort_values(by='Date')
-        daily_gee_df.to_csv(f'{output_dir}Daily_GEE.csv', index=False)
-        monthly_grace_df.to_csv(f'{output_dir}Monthly_GRACE.csv', index=False)
+        daily_gee_df.to_csv(f'{output_dir}Daily_GEE_GLDAS_{gldas_version}.csv', index=False)
+        monthly_grace_df.to_csv(f'{output_dir}Monthly_GRACE_GLDAS.csv', index=False)
     except Exception as e:
         print(f"Error {e}")
 
@@ -322,5 +333,6 @@ if __name__ == "__main__":
         input_vector_path=shapefile_path,
         start_year=2002,
         end_year=2024,
-        output_dir=out_dir
+        output_dir=out_dir,
+        gldas_version='V021'  # Change to 'V021' if needed
     )
