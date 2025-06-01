@@ -268,7 +268,6 @@ def gee_data_download(
         os.makedirs(temp_dir, exist_ok=True)
 
         # download daily GEE data
-
         grace_ic = ee.ImageCollection('NASA/GRACE/MASS_GRIDS_V04/MASCON_CRI')
         era5land_ic = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
         gldas_ic = ee.ImageCollection('NASA/GLDAS/V022/CLSM/G025/DA1D')
