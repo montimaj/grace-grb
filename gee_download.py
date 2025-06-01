@@ -167,6 +167,7 @@ def get_gee_data(
                 retry_download = False
             except (
                 ee.EEException, requests.exceptions.RequestException,
+                requests.exceptions.Timeout,
                 requests.exceptions.ConnectionError, RemoteDisconnected,
             ) as e:
                 print('Error', e, 'during download!')
@@ -302,7 +303,6 @@ def gee_data_download(
         monthly_grace_df = pd.concat(
             [pd.read_csv(monthly_csv) for monthly_csv in glob(f'{temp_dir}Monthly_GRACE_*.csv')]
         ).sort_values(by='Date')
-
         daily_gee_df.to_csv(f'{output_dir}Daily_GEE.csv', index=False)
         monthly_grace_df.to_csv(f'{output_dir}Monthly_GRACE.csv', index=False)
     except Exception as e:
