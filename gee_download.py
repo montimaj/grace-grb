@@ -78,6 +78,7 @@ def get_gee_data(
         et_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
             .select(gldas_bands[gldas_version][2]) \
             .sum() \
+            .multiply(86400) \
             .rename('et_gldas_mm')
         if gldas_version == 'V022':
             tws_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
