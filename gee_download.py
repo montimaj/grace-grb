@@ -235,8 +235,8 @@ def get_gee_data(
 
 def gee_data_download(
         input_vector_path: str,
-        start_year: 2002,
-        end_year: 2024,
+        start_year: int,
+        end_year: int,
         output_dir: str
 ) -> None:
     """
