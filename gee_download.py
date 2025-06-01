@@ -171,7 +171,7 @@ def get_gee_data(
                 requests.exceptions.ConnectionError, RemoteDisconnected,
             ) as e:
                 print('Error', e, 'during download!')
-                print('Retrying download...')
+                print('Retrying download for', gee_date, '...')
                 retry_download = True
             time.sleep(0.001)
 
@@ -221,12 +221,12 @@ def get_gee_data(
                     df.to_csv(monthly_csv, index=False)
                     retry_download = False
                 except (
-                        ee.EEException, requests.exceptions.RequestException,
+                        requests.exceptions.RequestException,
                         requests.exceptions.Timeout,
                         requests.exceptions.ConnectionError, RemoteDisconnected,
                 ) as e:
                     print('Error', e, 'during download!')
-                    print('Retrying download...')
+                    print('Retrying download for GRACE', month_yr, '...')
                     retry_download = True
                 time.sleep(0.001)
         except ee.EEException:
