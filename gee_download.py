@@ -13,6 +13,7 @@ import time
 import requests
 from glob import glob
 from joblib import Parallel, delayed
+from urllib.error import HTTPError
 from http.client import RemoteDisconnected
 
 
@@ -168,7 +169,9 @@ def get_gee_data(
             except (
                 ee.EEException, requests.exceptions.RequestException,
                 requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError, RemoteDisconnected,
+                HTTPError,
+                requests.exceptions.ConnectionError,
+                RemoteDisconnected,
             ) as e:
                 print('Error', e, 'during download!')
                 print('Retrying download for', gee_date, '...')
@@ -223,7 +226,9 @@ def get_gee_data(
                 except (
                         requests.exceptions.RequestException,
                         requests.exceptions.Timeout,
-                        requests.exceptions.ConnectionError, RemoteDisconnected,
+                        HTTPError,
+                        requests.exceptions.ConnectionError,
+                        RemoteDisconnected,
                 ) as e:
                     print('Error', e, 'during download!')
                     print('Retrying download for GRACE', month_yr, '...')
