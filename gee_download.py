@@ -301,7 +301,7 @@ def gee_data_download(
         # Parallel processing for daily and monthly data
         num_years = len(year_list)
         print(f'Downloading {num_years} years of data parallely...')
-        Parallel(n_jobs=15)(
+        Parallel(n_jobs=num_years)(
             delayed(get_gee_data)(
                 year,
                 daily_date_dict,
@@ -331,11 +331,10 @@ if __name__ == "__main__":
     out_dir = f'{input_dir}Outputs/'
     os.makedirs(out_dir, exist_ok=True)
     shapefile_path = f"{input_dir}Ganga Basin Shapefile/Ganga_basin.shp"
-    gldas_version = 'V021'  # Change to 'V021' if needed
     gee_data_download(
         input_vector_path=shapefile_path,
         start_year=2002,
         end_year=2024,
         output_dir=out_dir,
-        gldas_version=gldas_version
+        gldas_version='V021'  # Change to 'V021' if needed
     )
