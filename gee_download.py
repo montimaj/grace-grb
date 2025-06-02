@@ -78,7 +78,6 @@ def get_gee_data(
         et_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
             .select(gldas_bands[gldas_version][2]) \
             .sum() \
-            .multiply(86400) \
             .rename('et_gldas_mm')
         if gldas_version == 'V022':
             tws_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
@@ -173,6 +172,8 @@ def get_gee_data(
                 cols = df.columns.tolist()
                 cols = ['Date'] + [col for col in cols if col != 'Date']
                 df = df[cols]
+                et_cols = [col for col in df.columns if 'et_gldas' in col]
+                df[et_cols] *= 86400 # Convert mm/s to mm/day
                 df.to_csv(daily_csv, index=False)
                 retry_download = False
             except (
@@ -300,7 +301,7 @@ def gee_data_download(
         # Parallel processing for daily and monthly data
         num_years = len(year_list)
         print(f'Downloading {num_years} years of data parallely...')
-        Parallel(n_jobs=num_years)(
+        Parallel(n_jobs=15)(
             delayed(get_gee_data)(
                 year,
                 daily_date_dict,
@@ -330,10 +331,11 @@ if __name__ == "__main__":
     out_dir = f'{input_dir}Outputs/'
     os.makedirs(out_dir, exist_ok=True)
     shapefile_path = f"{input_dir}Ganga Basin Shapefile/Ganga_basin.shp"
+    gldas_version = 'V021'  # Change to 'V021' if needed
     gee_data_download(
         input_vector_path=shapefile_path,
         start_year=2002,
         end_year=2024,
         output_dir=out_dir,
-        gldas_version='V021'  # Change to 'V021' if needed
+        gldas_version=gldas_version
     )
