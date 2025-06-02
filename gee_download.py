@@ -340,5 +340,5 @@ if __name__ == "__main__":
         start_year=2002,
         end_year=2024,
         output_dir=out_dir,
-        gldas_version='V021'  # Change to 'V021' if needed
+        gldas_version='V021'  # Change to 'V022' if needed
     )
