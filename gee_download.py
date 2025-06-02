@@ -22,7 +22,8 @@ def get_gee_data(
         daily_date_dict: dict,
         monthly_date_dict: dict,
         fc: ee.FeatureCollection,
-        output_dir: str,
+        daily_output_dir: str,
+        monthly_output_dir: str,
         gldas_ic: ee.ImageCollection,
         era5land_ic: ee.ImageCollection,
         grace_ic: ee.ImageCollection,
@@ -36,7 +37,8 @@ def get_gee_data(
         daily_date_dict: Dictionary containing lists of daily dates for each year.
         monthly_date_dict: Dictionary containing lists of monthly dates for each year.
         fc: FeatureCollection containing geometries for which to download data.
-        output_dir: Directory where the downloaded data will be saved.
+        daily_output_dir: Directory where the downloaded daily data will be saved.
+        monthly_output_dir: Directory where the downloaded monthly data will be saved.
         gldas_ic: GLDAS ImageCollection.
         era5land_ic: ERA5-Land ImageCollection.
         grace_ic: GRACE ImageCollection.
@@ -51,7 +53,7 @@ def get_gee_data(
         opt_url='https://earthengine-highvolume.googleapis.com'
     )
     for gee_date in daily_date_dict[year]:
-        daily_csv = f'{output_dir}Daily_GEE_{gee_date}.csv'
+        daily_csv = f'{daily_output_dir}Daily_GEE_{gee_date}.csv'
         if os.path.exists(daily_csv):
             continue
         year, month, day = gee_date.split('-')
@@ -187,9 +189,8 @@ def get_gee_data(
                 print('Retrying download for', gee_date, '...')
                 retry_download = True
             time.sleep(0.001)
-
     for month_yr in monthly_date_dict[year]:
-        monthly_csv = f'{output_dir}Monthly_GRACE_{month_yr}.csv'
+        monthly_csv = f'{monthly_output_dir}Monthly_GRACE_{month_yr}.csv'
         if os.path.exists(monthly_csv):
             continue
         year, month = month_yr.split('-')
@@ -276,8 +277,10 @@ def gee_data_download(
         gdf = input_gdf.to_crs("EPSG:4326")
         geo_json = gdf.to_json()
         fc = ee.FeatureCollection(json.loads(geo_json))
-        temp_dir = f'{output_dir}temp/GLDAS_{gldas_version}/'
-        os.makedirs(temp_dir, exist_ok=True)
+        daily_temp_dir = f'{output_dir}temp/GLDAS_{gldas_version}/'
+        monthly_temp_dir = f'{output_dir}temp/GRACE/'
+        os.makedirs(daily_temp_dir, exist_ok=True)
+        os.makedirs(monthly_temp_dir, exist_ok=True)
         # download daily GEE data
         grace_ic = ee.ImageCollection('NASA/GRACE/MASS_GRIDS_V04/MASCON_CRI')
         era5land_ic = ee.ImageCollection('ECMWF/ERA5_LAND/DAILY_AGGR')
@@ -300,14 +303,15 @@ def gee_data_download(
             monthly_date_dict[year] = month_yr_list
         # Parallel processing for daily and monthly data
         num_years = len(year_list)
-        print(f'Downloading {num_years} years of data parallely...')
+        print(f'Downloading {num_years} years of data parallely using GLDAS {gldas_version}...')
         Parallel(n_jobs=num_years)(
             delayed(get_gee_data)(
                 year,
                 daily_date_dict,
                 monthly_date_dict,
                 fc,
-                temp_dir,
+                daily_temp_dir,
+                monthly_temp_dir,
                 gldas_ic,
                 era5land_ic,
                 grace_ic,
@@ -315,13 +319,13 @@ def gee_data_download(
             ) for year in year_list
         )
         daily_gee_df = pd.concat(
-            [pd.read_csv(daily_csv) for daily_csv in glob(f'{temp_dir}Daily_GEE_*.csv')]
+            [pd.read_csv(daily_csv) for daily_csv in glob(f'{daily_temp_dir}Daily_GEE_*.csv')]
         ).sort_values(by='Date')
         monthly_grace_df = pd.concat(
-            [pd.read_csv(monthly_csv) for monthly_csv in glob(f'{temp_dir}Monthly_GRACE_*.csv')]
+            [pd.read_csv(monthly_csv) for monthly_csv in glob(f'{monthly_temp_dir}Monthly_GRACE_*.csv')]
         ).sort_values(by='Date')
         daily_gee_df.to_csv(f'{output_dir}Daily_GEE_GLDAS_{gldas_version}.csv', index=False)
-        monthly_grace_df.to_csv(f'{output_dir}Monthly_GRACE_GLDAS.csv', index=False)
+        monthly_grace_df.to_csv(f'{output_dir}Monthly_GRACE.csv', index=False)
     except Exception as e:
         print(f"Error {e}")
 
@@ -336,5 +340,5 @@ if __name__ == "__main__":
         start_year=2002,
         end_year=2024,
         output_dir=out_dir,
-        gldas_version='V022'  # Change to 'V021' if needed
+        gldas_version='V021'  # Change to 'V021' if needed
     )
