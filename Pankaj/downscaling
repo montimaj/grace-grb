@@ -145,12 +145,6 @@ mae = mean_absolute_error(pred_df['Actual_TWSA'], pred_df['Predicted_TWSA'])
 rmse = np.sqrt(mean_squared_error(pred_df['Actual_TWSA'], pred_df['Predicted_TWSA']))
 r2 = r2_score(pred_df['Actual_TWSA'], pred_df['Predicted_TWSA'])
 
-with open("figures/model_metrics_BiLSTM_Att.txt", "w") as f:
-    f.write(f"Model Evaluation Metrics:\n")
-    f.write(f"MAE  = {mae:.4f}\n")
-    f.write(f"RMSE = {rmse:.4f}\n")
-    f.write(f"R²   = {r2:.4f}\n")
-
 # Visualizations
 plt.figure(figsize=(14, 5))
 plt.plot(pred_df['Date'], pred_df['Actual_TWSA'], label='Actual TWSA')
