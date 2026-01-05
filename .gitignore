@@ -195,3 +195,4 @@ cython_debug/
 Literature
 spatial_data_synthetic.csv
 .DS_Store
+Results.zip

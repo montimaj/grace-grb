@@ -1,7 +1,7 @@
 # Assessing hydrological dynamics in the Ganges Basin, India using satellite remote sensing and machine learning
 
 ## Citation
-Kaushik, P. R., Lenczuk, A., Majumdar, S., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2025). Assessing hydrological dynamics in the Ganges Basin, India using satellite remote sensing and machine learning. Accepted for poster presentation at IEEE IGARSS 2025, Brisbane, Australia.
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2026). Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin. _In prep. for Journal of Hydrology: Regional Studies._
 
 ## Abstract
 The climate of our planet is going through rapid and unforeseen changes, resulting in increased frequency, duration, and severity of droughts, which have enduring effects on flora and fauna, ecosystems, communities, and individuals. Therefore, monitoring climate patterns in various places has become increasingly significant. 

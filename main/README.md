@@ -2,6 +2,9 @@
 
 A comprehensive framework for downscaling GRACE Terrestrial Water Storage (TWS) data using multiple machine learning models with different holdout validation strategies.
 
+## Citation
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2026). Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin. _In prep. for Journal of Hydrology: Regional Studies._
+
 <img src="../Data/Readme_Figs/infographic.png" width=800/>
 
 ## Table of Contents
