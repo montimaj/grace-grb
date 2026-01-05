@@ -159,7 +159,7 @@ Given the temporal nature of the data, proper validation is critical to avoid ov
 - **Time Series CV**: Walk-forward validation with expanding training window
 
 The temporal split ensures:
-$$t_{train} < t_{test} \quad \forall \, t_{train} \in \mathcal{D}_{train}, \, t_{test} \in \mathcal{D}_{test}$$
+$$t_{train} < t_{test} \quad \forall \, t_{train} \in D_{train}, \, t_{test} \in D_{test}$$
 
 #### 3. Grouped Holdout (for Multi-Basin Analysis)
 
