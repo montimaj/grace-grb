@@ -67,7 +67,15 @@ Download the repository from the compressed file link at the top right of the re
 Unzip all zipped files.  Several of the input datasets in this repository are zipped for efficient storage and must be unzipped before they can be used to run this project.
 
 #### Repository disk space requirements
-//TODO
+
+| Component | Size | Description |
+|-----------|------|-------------|
+| Data/ | ~150 MB | Input data (GRACE TWS, GLDAS variables, shapefiles) |
+| Results/ | ~150 MB | Generated outputs (figures, predictions, maps) |
+| main/ | <1 MB | Source code |
+| **Total** | **~500 MB** | Full repository with all outputs |
+
+**Note:** The Results folder size will vary depending on how many analyses are run and which models are used.
 
 ### 3. Creating the conda environment and installing packages
 Open Linux/Mac terminal or Windows PowerShell and run the following:
@@ -88,4 +96,39 @@ After that, run ```earthengine authenticate```. The installation and authenticat
 for the earth-engine Python API is available [here](https://developers.google.com/earth-engine/guides/python_install). 
 
 ### 5. Running the code
-See [here](main/README.md) for details on methods and running the scripts
+
+See [main/README.md](main/README.md) for detailed documentation on methods and API reference.
+
+#### Quick Start
+
+```bash
+cd main
+
+# Run all analyses (random, temporal, spatial holdout) with all models
+python run_analysis.py --analysis all --compare
+
+# Run specific analysis type
+python run_analysis.py --analysis temporal
+
+# Run with specific models only
+python run_analysis.py -a random -m bilstm_attention xgboost lightgbm
+
+# Generate monthly/seasonal TWS maps (after running temporal analysis)
+python generate_monthly_maps.py
+```
+
+#### Available Models
+- `bilstm_attention` - BiLSTM with Attention mechanism
+- `bilstm` - Bidirectional LSTM
+- `lstm` - Standard LSTM
+- `xgboost` - XGBoost Regressor
+- `lightgbm` - LightGBM Regressor
+- `random_forest` - Random Forest Regressor
+
+#### Output Files
+Results are saved to `Results/figures/` including:
+- Model predictions (CSV) with train/test splits
+- Performance plots (actual vs predicted, residuals)
+- SHAP analysis plots (feature importance, dependence)
+- Model comparison summaries
+- Monthly/seasonal TWS maps with statistics
