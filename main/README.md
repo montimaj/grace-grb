@@ -1,4 +1,4 @@
-# TWS Downscaling with Machine Learning Models
+# Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin
 
 A comprehensive framework for downscaling GRACE Terrestrial Water Storage (TWS) data using multiple machine learning models with different holdout validation strategies.
 
