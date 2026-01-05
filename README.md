@@ -16,6 +16,35 @@ It also provides more relevant and timely information for operational decision-m
 
 <img src="Data/Readme_Figs/Graphical_Abstract.png" width="600"/>
 
+## Project Structure
+
+```
+grace-grb/
+├── README.md                           # Main readme
+├── LICENSE                             # License file
+├── Data/                               # Input data files
+│   ├── All_Data.xlsx                   # Predictor variables (SMS, ET, rainfall, runoff, GWSA)
+│   ├── TWS_JPL.xlsx                    # GRACE TWS data
+│   ├── Ganga Basin Shapefile/          # Basin boundary shapefiles
+│   ├── Outputs/                        # Processed data outputs
+│   └── Readme_Figs/                    # Figures for documentation
+├── Results/                            # Analysis results
+├── main/                               # Main codebase
+│   ├── README.md                       # Detailed methods documentation
+│   ├── models.py                       # ML model wrapper classes
+│   ├── utils.py                        # Utility functions (metrics, plotting, SHAP)
+│   ├── holdout_random.py               # Random holdout analysis
+│   ├── holdout_temporal.py             # Temporal holdout analysis
+│   ├── holdout_spatial.py              # Spatial/grouped holdout analysis
+│   ├── run_analysis.py                 # Main CLI entry point
+│   ├── gee_download.py                 # Google Earth Engine data download
+│   └── archive/                        # Original standalone scripts
+│       ├── downscaling.py              # Original BiLSTM+Attention script
+│       ├── DownscalingBiLSTM.py        # Original BiLSTM script
+│       ├── downscalingLSTM.py          # Original LSTM script
+│       └── GRACE_downscaling.pynb      # Jupyter notebook
+```
+
 ## Running the project
 
 ### 1. Download and install Anaconda/Miniconda
@@ -43,8 +72,7 @@ Open Linux/Mac terminal or Windows PowerShell and run the following:
 ```
 conda create -y -n grace-grb python=3.12
 conda activate grace-grb
-conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl
-conda install -y -c conda-forge dask-ml dask-jobqueue swifter
+conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap
 ```
 
 ### 4. Google Earth Engine Authentication
@@ -58,6 +86,4 @@ After that, run ```earthengine authenticate```. The installation and authenticat
 for the earth-engine Python API is available [here](https://developers.google.com/earth-engine/guides/python_install). 
 
 ### 5. Running the code
-```
-python gee_download.py
-```
+See [here](main/README.md) for details on methods and running the scripts
