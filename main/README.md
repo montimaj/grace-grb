@@ -249,15 +249,11 @@ Model performance is assessed using multiple complementary metrics:
 
 ### Dependencies
 
-```bash
-conda install -y -c conda-forge pytorch numpy pandas scikit-learn matplotlib openpyxl geopandas shap
-conda install -y -c conda-forge lightgbm py-xgboost
+Open Linux/Mac terminal or Windows PowerShell and run the following:
 ```
-
-Or using pip:
-
-```bash
-pip install torch numpy pandas scikit-learn matplotlib openpyxl geopandas lightgbm xgboost shap
+conda create -y -n grace-grb python=3.12
+conda activate grace-grb
+conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap
 ```
 
 ### Required Data Files
