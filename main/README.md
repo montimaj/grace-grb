@@ -275,24 +275,33 @@ pip install torch numpy pandas scikit-learn matplotlib openpyxl geopandas lightg
 ```
 main/
 ├── README.md                 # This documentation
-├── models.py                 # Model wrapper classes
-├── utils.py                  # Utility functions (metrics, plotting, SHAP)
+├── models.py                 # ML model wrapper classes (LSTM, BiLSTM, XGBoost, etc.)
+├── utils.py                  # Utility functions (metrics, plotting, SHAP analysis)
 ├── holdout_random.py         # Random holdout analysis
 ├── holdout_temporal.py       # Temporal holdout analysis
-├── holdout_spatial.py        # Spatial holdout analysis
-├── run_analysis.py           # Main entry point
-├── generate_monthly_maps.py  # Monthly/seasonal TWS map generation
+├── holdout_spatial.py        # Spatial/grouped holdout analysis
+├── run_analysis.py           # Main CLI entry point
+├── generate_monthly_maps.py  # Monthly/seasonal TWS map and time series generation
 ├── gee_download.py           # Google Earth Engine data download
 ├── Data/
 │   ├── All_Data.xlsx         # Input features (GLDAS variables)
 │   ├── TWS_JPL.xlsx          # Target variable (GRACE TWS)
 │   └── Ganga Basin Shapefile/
 │       └── Ganga_basin.shp   # Basin boundary for visualization
-└── outputs/                  # Generated outputs
-    ├── temporal/             # Temporal holdout results
-    ├── random/               # Random holdout results
-    ├── spatial/              # Spatial holdout results
-    └── maps/                 # Monthly/seasonal TWS maps
+└── ../Results/figures/       # Generated outputs
+    ├── temporal_holdout/     # Temporal holdout results
+    │   ├── *_predictions_*.csv           # Model predictions
+    │   ├── *_full_predictions_*.csv      # Train+test predictions
+    │   ├── *_shap_*.png                  # SHAP analysis plots
+    │   └── *.png                         # Performance plots
+    ├── random_holdout/       # Random holdout results
+    ├── spatial_holdout/      # Spatial holdout results
+    └── monthly_seasonal_maps/# Monthly/seasonal TWS maps
+        ├── monthly_maps_*.png            # 12-panel monthly maps
+        ├── seasonal_maps_*.png           # 4-panel seasonal maps
+        ├── model_comparison_*.png        # Multi-model comparisons
+        ├── *_time_series_*.png           # Time series with std dev
+        └── *_averages_all_models.csv     # Summary statistics
 ```
 
 ## Models

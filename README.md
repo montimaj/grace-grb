@@ -28,21 +28,23 @@ grace-grb/
 │   ├── Ganga Basin Shapefile/          # Basin boundary shapefiles
 │   ├── Outputs/                        # Processed data outputs
 │   └── Readme_Figs/                    # Figures for documentation
-├── Results/                            # Analysis results
+|   └── archive/                        # Original standalone scripts that are not used
+├── Results/                            # Analysis results and figures
+│   └── figures/                        # Generated plots and maps
+│       ├── temporal_holdout/           # Temporal analysis outputs
+│       ├── random_holdout/             # Random analysis outputs
+│       ├── spatial_holdout/            # Spatial analysis outputs
+│       └── monthly_seasonal_maps/      # Monthly/seasonal TWS maps
 ├── main/                               # Main codebase
 │   ├── README.md                       # Detailed methods documentation
-│   ├── models.py                       # ML model wrapper classes
-│   ├── utils.py                        # Utility functions (metrics, plotting, SHAP)
+│   ├── models.py                       # ML model wrapper classes (LSTM, BiLSTM, XGBoost, etc.)
+│   ├── utils.py                        # Utility functions (metrics, plotting, SHAP analysis)
 │   ├── holdout_random.py               # Random holdout analysis
 │   ├── holdout_temporal.py             # Temporal holdout analysis
 │   ├── holdout_spatial.py              # Spatial/grouped holdout analysis
 │   ├── run_analysis.py                 # Main CLI entry point
+│   ├── generate_monthly_maps.py        # Monthly/seasonal TWS map generation
 │   ├── gee_download.py                 # Google Earth Engine data download
-│   └── archive/                        # Original standalone scripts
-│       ├── downscaling.py              # Original BiLSTM+Attention script
-│       ├── DownscalingBiLSTM.py        # Original BiLSTM script
-│       ├── downscalingLSTM.py          # Original LSTM script
-│       └── GRACE_downscaling.pynb      # Jupyter notebook
 ```
 
 ## Running the project
