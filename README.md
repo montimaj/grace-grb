@@ -1,7 +1,7 @@
 # Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin
 
 ## Citation
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2026). Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin. _In prep. for Journal of Hydrology: Regional Studies._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2026). Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin. _Submitted to Groundwater for Sustainable Development._
 
 ## Abstract
 The climate of our planet is going through rapid and unforeseen changes, resulting in increased frequency, duration, and severity of droughts, which have enduring effects on flora and fauna, ecosystems, communities, and individuals. Therefore, monitoring climate patterns in various places has become increasingly significant. 
