@@ -293,7 +293,7 @@ def plot_spatial_groups(
     ax2.set_title("Train/Test Spatial Split")
     
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}spatial_groups.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}spatial_groups.png", dpi=600)
     plt.close()
 
 
@@ -365,13 +365,31 @@ def run_spatial_holdout_analysis(
     """
     set_seed(seed)
     os.makedirs(output_dir, exist_ok=True)
-    
+
+    # --------------------------------------------------------------------- #
+    # IMPORTANT CAVEAT (documented for reviewers).
+    # This "spatial" holdout runs on SYNTHETIC data: the single basin-averaged
+    # time series is replicated across a handful of fabricated point locations
+    # with small distance-scaled noise. Because train and test locations share
+    # near-identical replicates of the SAME series, the split does not measure
+    # genuine spatial transferability, and near-perfect scores (e.g. R2 ~ 0.99)
+    # are an artefact of that replication (information leakage by construction).
+    # Real spatial generalisation requires gridded (per-pixel) GRACE + gridded
+    # predictors, which are not part of this basin-averaged dataset. Treat the
+    # results below as a noise-sensitivity demonstration only.
+    # --------------------------------------------------------------------- #
+    warn = ("SYNTHETIC SPATIAL HOLDOUT: replicated basin series + noise; "
+            "scores reflect sensitivity to added noise, NOT spatial transferability.")
+    print("\n" + "!" * 78 + f"\n{warn}\n" + "!" * 78)
+    with open(os.path.join(output_dir, "SYNTHETIC_DATA_DISCLAIMER.txt"), "w") as fh:
+        fh.write(warn + "\n")
+
     if predictors is None:
         predictors = ['SMS', 'ET', 'rainfall', 'runoff', 'GWSA']
-    
+
     if models_to_run is None:
         models_to_run = ['bilstm_attention', 'bilstm', 'lstm', 'xgboost', 'lightgbm', 'randomforest']
-    
+
     # Load data
     print("Loading spatial data...")
     df = load_spatial_data(data_file, lat_col, lon_col, date_col)
@@ -509,10 +527,11 @@ def run_spatial_holdout_analysis(
                 ax.set_ylabel("Predicted TWSA (mm)")
                 ax.grid(True, alpha=0.3)
             
-            plt.suptitle(f"Predictions by Spatial Group [{model.name}]")
+            from plot_style import pretty_model
+            plt.suptitle(f"Predictions by Spatial Group [{pretty_model(model.name)}]")
             plt.tight_layout()
             safe_name = model.name.replace('+', '_').replace(' ', '_')
-            plt.savefig(f"{output_dir}/spatial_group_scatter_{safe_name}.png", dpi=300)
+            plt.savefig(f"{output_dir}/spatial_group_scatter_{safe_name}.png", dpi=600)
             plt.close()
             
             # Run SHAP analysis
@@ -565,7 +584,17 @@ def run_spatial_holdout_analysis(
             }
         cv_df = pd.DataFrame(cv_summary).T
         cv_df.to_csv(f"{output_dir}/spatial_cv_results.csv")
-    
+
+    # Statistical outputs (note: on synthetic replicated data; see disclaimer).
+    from stats_utils import emit_holdout_statistics
+    test_preds = {name: res['y_test_pred'] for name, res in results.items() if 'y_test_pred' in res}
+    if test_preds:
+        emit_holdout_statistics(
+            y_test, test_preds, output_dir, prefix="spatial",
+            dates_train=dates_train, dates_test=dates_test,
+            n_features=len(feature_names), seed=seed,
+        )
+
     return results
 
 

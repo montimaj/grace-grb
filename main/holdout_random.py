@@ -297,7 +297,18 @@ def run_random_holdout_analysis(
     
     # Create summary report
     create_summary_report(results, output_dir, "Random Holdout", prefix="random")
-    
+
+    # Statistical outputs: bootstrap CIs, model-comparison significance, split report
+    # (reviewer requests: uncertainty on metrics + statistical model comparison).
+    from stats_utils import emit_holdout_statistics
+    test_preds = {name: res['y_test_pred'] for name, res in results.items() if 'y_test_pred' in res}
+    if test_preds:
+        emit_holdout_statistics(
+            y_test, test_preds, output_dir, prefix="random",
+            dates_train=dates_train, dates_test=dates_test,
+            n_features=len(feature_names), seed=seed,
+        )
+
     return results
 
 

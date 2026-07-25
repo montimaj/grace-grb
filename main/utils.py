@@ -11,6 +11,7 @@ import matplotlib.dates as mdates
 from typing import Tuple, List, Dict, Optional, Union, Any
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from dataclasses import dataclass
+from plot_style import pretty_model, clean_feature, clean_features, R2
 
 # Optional SHAP import
 try:
@@ -90,7 +91,14 @@ def load_and_preprocess_data(
     tws_data['Month_Num'] = tws_data['Month'].map(month_map)
     tws_data['Date'] = pd.to_datetime(dict(year=tws_data.Year, month=tws_data.Month_Num, day=1))
     
-    # Drop duplicate dates and interpolate monthly TWS to daily
+    # NOTE (important for interpreting "daily" results): GRACE observes TWSA at
+    # MONTHLY resolution only. The daily target used to train the models is
+    # obtained by LINEARLY INTERPOLATING the monthly series to daily steps below.
+    # Consequently the daily target contains no independent daily observations,
+    # and direct daily validation is not possible from this dataset. Daily-scale
+    # skill is therefore assessed indirectly via the temporal closure test
+    # (see temporal_closure_validation.py): predicted daily TWSA is re-aggregated
+    # to monthly and compared against the ORIGINAL observed monthly GRACE.
     tws_data = tws_data.sort_values('Date').drop_duplicates(subset='Date')
     tws_data.set_index('Date', inplace=True)
     tws_monthly = tws_data['TWS'].resample('D').interpolate(method='linear').reset_index()
@@ -180,17 +188,31 @@ def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> EvaluationMetri
     """
     y_true = y_true.flatten()
     y_pred = y_pred.flatten()
-    
+
     mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    r2 = r2_score(y_true, y_pred)
-    
-    # Nash-Sutcliffe Efficiency
-    nse = 1 - (np.sum((y_true - y_pred) ** 2) / np.sum((y_true - np.mean(y_true)) ** 2))
-    
+
+    # R2 as the SQUARED PEARSON CORRELATION COEFFICIENT. This measures the
+    # strength of linear association between observed and predicted values and
+    # is insensitive to bias and scale. It is deliberately kept distinct from
+    # NSE: sklearn's r2_score is algebraically identical to NSE
+    # (both equal 1 - SSres/SStot), so reporting r2_score and NSE side by side
+    # would duplicate a single number. Pearson r-squared and NSE together
+    # separate "does the model track the shape of the signal?" (R2) from
+    # "does it also get the magnitude/bias right?" (NSE).
+    if np.std(y_true) == 0 or np.std(y_pred) == 0:
+        r2 = np.nan
+    else:
+        r = np.corrcoef(y_true, y_pred)[0, 1]
+        r2 = float(r ** 2)
+
+    # Nash-Sutcliffe Efficiency (algebraically equal to sklearn's r2_score).
+    denom = np.sum((y_true - np.mean(y_true)) ** 2)
+    nse = float(1 - (np.sum((y_true - y_pred) ** 2) / denom)) if denom != 0 else np.nan
+
     # Percent Bias
     pbias = 100 * np.sum(y_pred - y_true) / np.sum(y_true)
-    
+
     return EvaluationMetrics(mae=mae, rmse=rmse, r2=r2, nse=nse, pbias=pbias)
 
 
@@ -232,11 +254,11 @@ def plot_predictions(
     plt.plot(dates, y_pred, label='Predicted TWSA', linestyle='--', alpha=0.8)
     plt.xlabel("Date")
     plt.ylabel("TWSA (mm)")
-    plt.title(f"Actual vs Predicted TWSA [{model_name}]")
+    plt.title(f"Actual vs Predicted TWSA [{pretty_model(model_name)}]")
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}temporal_plot_{safe_name}.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}temporal_plot_{safe_name}.png", dpi=600)
     plt.close()
     
     # 2. Scatter Plot
@@ -246,11 +268,11 @@ def plot_predictions(
     plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='1:1 Line')
     plt.xlabel("Actual TWSA (mm)")
     plt.ylabel("Predicted TWSA (mm)")
-    plt.title(f"Scatter Plot [{model_name}]")
+    plt.title(f"Scatter Plot [{pretty_model(model_name)}]")
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}scatter_plot_{safe_name}.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}scatter_plot_{safe_name}.png", dpi=600)
     plt.close()
     
     # 3. Residual Plot
@@ -258,12 +280,12 @@ def plot_predictions(
     plt.figure(figsize=(14, 5))
     plt.plot(dates, residuals, color='gray', alpha=0.7)
     plt.axhline(0, color='red', linestyle='--')
-    plt.title(f"Residuals Plot [{model_name}]")
+    plt.title(f"Residuals Plot [{pretty_model(model_name)}]")
     plt.xlabel("Date")
     plt.ylabel("Residual (mm)")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}residuals_plot_{safe_name}.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}residuals_plot_{safe_name}.png", dpi=600)
     plt.close()
     
     # 4. Residual Distribution
@@ -273,11 +295,11 @@ def plot_predictions(
     plt.axvline(np.mean(residuals), color='blue', linestyle='--', label=f'Mean: {np.mean(residuals):.2f} mm')
     plt.xlabel("Residual (mm)")
     plt.ylabel("Frequency")
-    plt.title(f"Residual Distribution [{model_name}]")
+    plt.title(f"Residual Distribution [{pretty_model(model_name)}]")
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}residual_hist_{safe_name}.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}residual_hist_{safe_name}.png", dpi=600)
     plt.close()
 
 
@@ -296,12 +318,12 @@ def plot_training_loss(
     
     plt.figure(figsize=(8, 4))
     plt.plot(losses, marker='o', markersize=3)
-    plt.title(f"Training Loss Curve [{model_name}]")
+    plt.title(f"Training Loss Curve [{pretty_model(model_name)}]")
     plt.xlabel("Epoch")
     plt.ylabel("Huber Loss")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}training_loss_{safe_name}.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}training_loss_{safe_name}.png", dpi=600)
     plt.close()
 
 
@@ -328,12 +350,12 @@ def plot_feature_importance(
     
     plt.figure(figsize=(12, 6))
     plt.barh(range(len(names)), values, align='center')
-    plt.yticks(range(len(names)), names)
+    plt.yticks(range(len(names)), clean_features(names))
     plt.xlabel("Importance")
-    plt.title(f"Feature Importance [{model_name}]")
+    plt.title(f"Feature Importance [{pretty_model(model_name)}]")
     plt.gca().invert_yaxis()
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}feature_importance_{safe_name}.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}feature_importance_{safe_name}.png", dpi=600)
     plt.close()
 
 
@@ -372,12 +394,13 @@ def plot_model_comparison(
     metrics = ['MAE', 'RMSE', 'R2', 'NSE', 'PBIAS']
     colors = ['#2ecc71', '#3498db', '#9b59b6', '#e74c3c', '#f39c12']
     
+    disp_names = [pretty_model(m) for m in model_names]
     for i, (metric, color) in enumerate(zip(metrics, colors)):
         ax = axes[i]
         values = df[metric].values
-        bars = ax.bar(model_names, values, color=color, alpha=0.8)
-        ax.set_title(metric, fontsize=12, fontweight='bold')
-        ax.set_xticklabels(model_names, rotation=45, ha='right')
+        bars = ax.bar(disp_names, values, color=color, alpha=0.8)
+        ax.set_title(R2 if metric == 'R2' else metric, fontsize=12, fontweight='bold')
+        ax.set_xticklabels(disp_names, rotation=45, ha='right')
         ax.grid(True, alpha=0.3, axis='y')
         
         # Add value labels
@@ -390,7 +413,7 @@ def plot_model_comparison(
     
     plt.suptitle("Model Comparison", fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}model_comparison.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}model_comparison.png", dpi=600)
     plt.close()
     
     # Save metrics to CSV
@@ -479,7 +502,7 @@ def plot_train_test_comparison(
         ax.set_ylabel(label, fontsize=11)
         ax.set_title(f'{label} - Train vs Test', fontsize=12, fontweight='bold')
         ax.set_xticks(x)
-        ax.set_xticklabels(model_names, rotation=45, ha='right', fontsize=9)
+        ax.set_xticklabels([pretty_model(m) for m in model_names], rotation=45, ha='right', fontsize=9)
         ax.legend(loc='best')
         ax.grid(True, alpha=0.3, axis='y')
         
@@ -499,7 +522,7 @@ def plot_train_test_comparison(
     
     plt.suptitle('Training vs Test Performance Comparison', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}train_test_comparison.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}train_test_comparison.png", dpi=600)
     plt.close()
     
     # =============================================
@@ -511,13 +534,13 @@ def plot_train_test_comparison(
     ax1 = axes[0]
     r2_gaps = [overfitting_analysis[m]['R2_gap'] for m in model_names]
     colors = ['#e74c3c' if g > 0.1 else '#f39c12' if g > 0.05 else '#2ecc71' for g in r2_gaps]
-    bars = ax1.bar(model_names, r2_gaps, color=colors, alpha=0.8, edgecolor='black')
+    bars = ax1.bar([pretty_model(m) for m in model_names], r2_gaps, color=colors, alpha=0.8, edgecolor='black')
     ax1.axhline(y=0, color='black', linestyle='-', linewidth=1)
     ax1.axhline(y=0.05, color='orange', linestyle='--', linewidth=1, label='Moderate overfitting (0.05)')
     ax1.axhline(y=0.1, color='red', linestyle='--', linewidth=1, label='Severe overfitting (0.1)')
     ax1.set_ylabel('R² Gap (Train - Test)', fontsize=11)
     ax1.set_title('Overfitting Indicator: R² Gap', fontsize=12, fontweight='bold')
-    ax1.set_xticklabels(model_names, rotation=45, ha='right')
+    ax1.set_xticklabels([pretty_model(m) for m in model_names], rotation=45, ha='right')
     ax1.legend(loc='upper right', fontsize=8)
     ax1.grid(True, alpha=0.3, axis='y')
     
@@ -531,13 +554,13 @@ def plot_train_test_comparison(
     ax2 = axes[1]
     rmse_gaps = [overfitting_analysis[m]['RMSE_gap'] for m in model_names]
     colors = ['#e74c3c' if g > 2 else '#f39c12' if g > 1 else '#2ecc71' for g in rmse_gaps]
-    bars = ax2.bar(model_names, rmse_gaps, color=colors, alpha=0.8, edgecolor='black')
+    bars = ax2.bar([pretty_model(m) for m in model_names], rmse_gaps, color=colors, alpha=0.8, edgecolor='black')
     ax2.axhline(y=0, color='black', linestyle='-', linewidth=1)
     ax2.axhline(y=1, color='orange', linestyle='--', linewidth=1, label='Moderate overfitting (1 mm)')
     ax2.axhline(y=2, color='red', linestyle='--', linewidth=1, label='Severe overfitting (2 mm)')
     ax2.set_ylabel('RMSE Gap (Test - Train) [mm]', fontsize=11)
     ax2.set_title('Overfitting Indicator: RMSE Gap', fontsize=12, fontweight='bold')
-    ax2.set_xticklabels(model_names, rotation=45, ha='right')
+    ax2.set_xticklabels([pretty_model(m) for m in model_names], rotation=45, ha='right')
     ax2.legend(loc='upper right', fontsize=8)
     ax2.grid(True, alpha=0.3, axis='y')
     
@@ -548,7 +571,7 @@ def plot_train_test_comparison(
     
     plt.suptitle('Overfitting Analysis', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}overfitting_analysis.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}overfitting_analysis.png", dpi=600)
     plt.close()
     
     # =============================================
@@ -578,7 +601,7 @@ def plot_train_test_comparison(
             marker, color = 's', '#2ecc71'
         ax.scatter(train_r2[i], test_r2[i], s=150, marker=marker, c=color, 
                   edgecolors='black', linewidth=1.5, zorder=5)
-        ax.annotate(model, (train_r2[i], test_r2[i]), textcoords="offset points",
+        ax.annotate(pretty_model(model), (train_r2[i], test_r2[i]), textcoords="offset points",
                    xytext=(5, 5), fontsize=9, fontweight='bold')
     
     ax.set_xlabel('Training R²', fontsize=12)
@@ -590,7 +613,7 @@ def plot_train_test_comparison(
     ax.set_ylim(min_val, max_val)
     
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}train_test_scatter.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}train_test_scatter.png", dpi=600)
     plt.close()
     
     # =============================================
@@ -626,10 +649,11 @@ def plot_train_test_comparison(
     
     im = ax.imshow(heatmap_data.values, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
     
+    heatmap_labels = [c.replace('_R2', f' {R2}').replace('_', ' ') for c in heatmap_cols]
     ax.set_xticks(np.arange(len(heatmap_cols)))
     ax.set_yticks(np.arange(len(model_names)))
-    ax.set_xticklabels(heatmap_cols, rotation=45, ha='right')
-    ax.set_yticklabels(model_names)
+    ax.set_xticklabels(heatmap_labels, rotation=45, ha='right')
+    ax.set_yticklabels([pretty_model(m) for m in model_names])
     
     # Add text annotations
     for i in range(len(model_names)):
@@ -642,7 +666,7 @@ def plot_train_test_comparison(
     plt.colorbar(im, label='Score (0-1)')
     ax.set_title('Performance Heatmap: Train vs Test', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}performance_heatmap.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}performance_heatmap.png", dpi=600)
     plt.close()
     
     # =============================================
@@ -1042,13 +1066,13 @@ def plot_shap_summary(
     shap.summary_plot(
         shap_values,
         X_explain,
-        feature_names=feature_names,
+        feature_names=clean_features(feature_names),
         max_display=max_display,
         show=False
     )
-    plt.title(f"SHAP Summary Plot [{model_name}]")
+    plt.title(f"SHAP Summary Plot [{pretty_model(model_name)}]")
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}shap_summary_{safe_name}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{output_dir}/{prefix}shap_summary_{safe_name}.png", dpi=600, bbox_inches='tight')
     plt.close()
 
 
@@ -1101,11 +1125,11 @@ def plot_shap_bar(
     
     plt.figure(figsize=(10, 8))
     plt.barh(range(len(sorted_names)), sorted_values[::-1], align='center')
-    plt.yticks(range(len(sorted_names)), sorted_names[::-1])
+    plt.yticks(range(len(sorted_names)), [clean_feature(n) for n in sorted_names[::-1]])
     plt.xlabel("Mean |SHAP Value|")
-    plt.title(f"SHAP Feature Importance [{model_name}]")
+    plt.title(f"SHAP Feature Importance [{pretty_model(model_name)}]")
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}shap_bar_{safe_name}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{output_dir}/{prefix}shap_bar_{safe_name}.png", dpi=600, bbox_inches='tight')
     plt.close()
 
 
@@ -1164,19 +1188,19 @@ def plot_shap_dependence(
             idx,
             shap_values,
             X_explain,
-            feature_names=feature_names,
+            feature_names=clean_features(feature_names),
             ax=ax,
             show=False
         )
-        ax.set_title(f"{feature_names[idx]}")
+        ax.set_title(f"{clean_feature(feature_names[idx])}")
     
     # Hide unused subplots
     for i in range(len(top_indices), len(axes)):
         axes[i].set_visible(False)
     
-    plt.suptitle(f"SHAP Dependence Plots [{model_name}]", fontsize=14)
+    plt.suptitle(f"SHAP Dependence Plots [{pretty_model(model_name)}]", fontsize=14)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}shap_dependence_{safe_name}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{output_dir}/{prefix}shap_dependence_{safe_name}.png", dpi=600, bbox_inches='tight')
     plt.close()
 
 
@@ -1232,14 +1256,14 @@ def plot_shap_waterfall(
             values=shap_values[sample_idx],
             base_values=expected_value,
             data=X_explain[sample_idx],
-            feature_names=feature_names
+            feature_names=clean_features(feature_names)
         )
         
         plt.figure(figsize=(12, 8))
         shap.plots.waterfall(explanation, max_display=15, show=False)
-        plt.title(f"SHAP Waterfall Plot (Sample {sample_idx}) [{model_name}]")
+        plt.title(f"SHAP Waterfall Plot (Sample {sample_idx}) [{pretty_model(model_name)}]")
         plt.tight_layout()
-        plt.savefig(f"{output_dir}/{prefix}shap_waterfall_{safe_name}.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"{output_dir}/{prefix}shap_waterfall_{safe_name}.png", dpi=600, bbox_inches='tight')
         plt.close()
     except Exception as e:
         print(f"Could not create waterfall plot: {e}")
@@ -1288,10 +1312,10 @@ def run_shap_analysis(
     Dict with SHAP results or None
     """
     if not HAS_SHAP:
-        print(f"[{model_name}] SHAP analysis skipped - SHAP not installed")
+        print(f"[{pretty_model(model_name)}] SHAP analysis skipped - SHAP not installed")
         return None
     
-    print(f"\n[{model_name}] Running SHAP analysis...")
+    print(f"\n[{pretty_model(model_name)}] Running SHAP analysis...")
     
     # Compute SHAP values
     shap_result = compute_shap_values(
@@ -1300,20 +1324,20 @@ def run_shap_analysis(
     )
     
     if shap_result is None:
-        print(f"[{model_name}] SHAP computation failed")
+        print(f"[{pretty_model(model_name)}] SHAP computation failed")
         return None
     
     # Generate plots
-    print(f"[{model_name}] Generating SHAP summary plot...")
+    print(f"[{pretty_model(model_name)}] Generating SHAP summary plot...")
     plot_shap_summary(shap_result, model_name, output_dir, prefix)
     
-    print(f"[{model_name}] Generating SHAP bar plot...")
+    print(f"[{pretty_model(model_name)}] Generating SHAP bar plot...")
     plot_shap_bar(shap_result, model_name, output_dir, prefix)
     
-    print(f"[{model_name}] Generating SHAP dependence plots...")
+    print(f"[{pretty_model(model_name)}] Generating SHAP dependence plots...")
     plot_shap_dependence(shap_result, model_name, output_dir, prefix)
     
-    print(f"[{model_name}] Generating SHAP waterfall plot...")
+    print(f"[{pretty_model(model_name)}] Generating SHAP waterfall plot...")
     plot_shap_waterfall(shap_result, model_name, output_dir, prefix)
     
     # Save SHAP values to CSV
@@ -1335,6 +1359,6 @@ def run_shap_analysis(
     
     mean_shap.to_csv(f"{output_dir}/{prefix}shap_importance_{safe_name}.csv", index=False)
     
-    print(f"[{model_name}] SHAP analysis complete!")
+    print(f"[{pretty_model(model_name)}] SHAP analysis complete!")
     
     return shap_result

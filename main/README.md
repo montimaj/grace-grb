@@ -194,15 +194,55 @@ Model performance is assessed using multiple complementary metrics:
 |--------|---------|----------------|
 | **MAE** | $\frac{1}{n}\sum_{i=1}^{n}\|y_i - \hat{y}_i\|$ | Average absolute error (mm) |
 | **RMSE** | $\sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}$ | Root mean squared error (mm) |
-| **R²** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | Explained variance (0–1) |
-| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | Nash-Sutcliffe Efficiency |
+| **R²** | $\left(\dfrac{\sum(y_i-\bar{y})(\hat{y}_i-\bar{\hat{y}})}{\sqrt{\sum(y_i-\bar{y})^2}\,\sqrt{\sum(\hat{y}_i-\bar{\hat{y}})^2}}\right)^2$ | **Squared Pearson correlation** — linear association, insensitive to bias/scale (0–1) |
+| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | Nash-Sutcliffe Efficiency — skill *including* bias |
 | **PBIAS** | $\frac{\sum(\hat{y}_i - y_i)}{\sum y_i} \times 100$ | Percent bias (%) |
+
+> **Note on R² vs NSE.** These are now **distinct** metrics. Earlier code computed
+> R² with `sklearn.metrics.r2_score`, which is algebraically identical to NSE
+> (both equal `1 − SSres/SStot`); the two therefore returned the same number.
+> R² is now the **squared Pearson correlation coefficient** (does the model track
+> the *shape* of the signal?), while NSE (`1 − SSres/SStot`) additionally
+> penalises magnitude/bias (does it get the *level* right?). A high R² with a
+> lower NSE indicates good phase agreement but a systematic bias.
 
 **Performance Benchmarks:**
 - NSE > 0.75: Very good
 - NSE 0.65–0.75: Good
 - NSE 0.50–0.65: Satisfactory
 - NSE < 0.50: Unsatisfactory
+
+### Statistical Rigor, Leakage Diagnostics, and Temporal Closure Validation
+
+Three modules add the inferential and validation layers needed for publication-grade reporting. They run automatically at the end of each holdout analysis and can also be invoked standalone.
+
+**`stats_utils.py` — uncertainty and significance**
+- `block_bootstrap_metric_cis` — 95% confidence intervals for MAE, RMSE, R², NSE, PBIAS via a **moving-block bootstrap** that respects temporal autocorrelation (block length auto-selected from the residual ACF).
+- `diebold_mariano` — Diebold–Mariano test (HLN small-sample correction, Newey–West HAC variance) for **whether two models differ significantly** in accuracy; plus `wilcoxon_abs_error` and `paired_bootstrap_metric_diff`.
+- `model_comparison_matrix` / `rank_models_with_significance` — pairwise significance and a best-model ranking.
+- `blocked_kfold_indices`, `purged_kfold_indices`, `compare_cv_leakage` — **leakage-aware cross-validation** contrasting shuffled, blocked and purged+embargoed schemes.
+- `describe_split`, `repeated_cv` — exact split sizes/date ranges and multi-seed repeated CV.
+
+**`temporal_closure_validation.py` — daily→monthly closure**
+Re-aggregates each model's predicted **daily** TWSA to monthly means and compares against the **original observed monthly GRACE** (`TWS_JPL.xlsx`, observed months only), with bootstrap CIs and figures. This is the appropriate check for daily-scale consistency when the ground truth exists only at monthly resolution.
+
+**`analyze_results.py` — driver**
+Produces all of the above from saved predictions without retraining, plus the leakage diagnostic:
+```bash
+python analyze_results.py --holdout-dir ../Results/figures/temporal_holdout   # CIs + DM significance
+python analyze_results.py --leakage --models randomforest xgboost             # random vs blocked vs purged
+python temporal_closure_validation.py --predictions-dir ../Results/figures/temporal_holdout
+```
+
+### Scope and Limitations (please read before interpreting results)
+
+- **Basin-scale, spatially integrated.** All inputs are reduced to one basin-mean value per time step. Results are a *temporal* downscaling of a basin-mean series, **not a per-pixel product**. The maps in `generate_monthly_maps.py` fill the basin polygon with a single value and are labelled as basin-scale summaries (a footnote is drawn on each). Per-pixel skill/RMS maps require gridded GRACE + gridded predictors (future work).
+- **Daily target is interpolated.** GRACE is monthly; the daily target is a linear interpolation of the monthly series (see `utils.load_and_preprocess_data`). There is **no independent daily observation**, so direct daily validation is not possible; daily consistency is assessed via the temporal closure test above.
+- **Spatial holdout is synthetic.** It replicates the single basin series across fabricated locations with noise; train/test share near-identical replicates, so it **leaks by construction** and does not measure spatial transferability. It is retained only as a noise-sensitivity demonstration, with a printed disclaimer and a `SYNTHETIC_DATA_DISCLAIMER.txt` written to its output directory.
+
+### Figure conventions
+
+All figures render at **600 DPI**; labels/legends avoid underscores, R² is shown as a superscript, and model/feature names are human-readable (`plot_style.py`).
 
 ### Workflow Summary
 
@@ -276,6 +316,10 @@ main/
 ├── run_analysis.py           # Main CLI entry point
 ├── generate_monthly_maps.py  # Monthly/seasonal TWS map and time series generation
 ├── gee_download.py           # Google Earth Engine data download
+├── stats_utils.py            # Bootstrap CIs, DM/Wilcoxon significance, leakage-aware CV, split reports
+├── temporal_closure_validation.py  # Daily→monthly temporal closure test vs original monthly GRACE
+├── analyze_results.py        # Post-hoc CIs + model-comparison significance + leakage diagnostic
+├── plot_style.py             # Central figure styling (600 DPI, clean labels, R² superscript)
 ├── Data/
 │   ├── All_Data.xlsx         # Input features (GLDAS variables)
 │   ├── TWS_JPL.xlsx          # Target variable (GRACE TWS)
@@ -974,8 +1018,8 @@ Recommendations:
 |--------|---------|---------------|-------------|
 | **MAE** | $\frac{1}{n}\sum\|y_i - \hat{y}_i\|$ | 0 | Mean Absolute Error |
 | **RMSE** | $\sqrt{\frac{1}{n}\sum(y_i - \hat{y}_i)^2}$ | 0 | Root Mean Squared Error |
-| **R²** | $1 - \frac{SS_{res}}{SS_{tot}}$ | 1 | Coefficient of Determination |
-| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | 1 | Nash-Sutcliffe Efficiency |
+| **R²** | $\left(\text{corr}(y,\hat{y})\right)^2$ (squared Pearson) | 1 | Linear association (bias-insensitive) |
+| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | 1 | Nash-Sutcliffe Efficiency (bias-sensitive) |
 | **PBIAS** | $100 \times \frac{\sum(\hat{y}_i - y_i)}{\sum y_i}$ | 0% | Percent Bias |
 
 ## Example Workflow

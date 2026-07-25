@@ -1,0 +1,2 @@
+name,n_total,n_train,n_test,test_fraction,train_start,train_end,test_start,test_end,n_features
+random,8183,6546,1637,0.2,2002-04-09,2024-09-01,2002-04-08,2024-08-31,35

@@ -41,11 +41,17 @@ grace-grb/
 │   ├── utils.py                        # Utility functions (metrics, plotting, SHAP analysis)
 │   ├── holdout_random.py               # Random holdout analysis
 │   ├── holdout_temporal.py             # Temporal holdout analysis
-│   ├── holdout_spatial.py              # Spatial/grouped holdout analysis
+│   ├── holdout_spatial.py              # Spatial/grouped holdout analysis (synthetic; see limitations)
 │   ├── run_analysis.py                 # Main CLI entry point
 │   ├── generate_monthly_maps.py        # Monthly/seasonal TWS map generation
 │   ├── gee_download.py                 # Google Earth Engine data download
+│   ├── stats_utils.py                  # Bootstrap CIs, significance tests, leakage-aware CV
+│   ├── temporal_closure_validation.py  # Daily→monthly temporal closure test
+│   ├── analyze_results.py              # Post-hoc CIs, model-comparison significance, leakage diagnostic
+│   ├── plot_style.py                   # Central figure styling (600 DPI, clean labels)
 ```
+
+> **Scope note.** This is a **basin-scale (spatially integrated) temporal** downscaling: all inputs are basin-mean series, so results are not per-pixel and the "maps" are basin-scale summaries. The daily target is a linear interpolation of monthly GRACE (no independent daily observation), so daily consistency is assessed via the **temporal closure test** (`temporal_closure_validation.py`). The spatial holdout runs on **synthetic** replicated data and is a noise-sensitivity demonstration only. See [main/README.md](main/README.md#scope-and-limitations-please-read-before-interpreting-results) for details.
 
 ## Running the project
 

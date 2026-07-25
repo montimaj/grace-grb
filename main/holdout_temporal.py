@@ -214,7 +214,7 @@ def plot_temporal_split(
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{prefix}temporal_split.png", dpi=300)
+    plt.savefig(f"{output_dir}/{prefix}temporal_split.png", dpi=600)
     plt.close()
 
 
@@ -377,14 +377,15 @@ def run_temporal_holdout_analysis(
             plt.fill_between(dates, y.min(), y.max(), 
                            where=[d >= dates_test[0] for d in dates],
                            alpha=0.1, color='red', label='Test Period')
+            from plot_style import pretty_model
             plt.xlabel("Date")
             plt.ylabel("TWSA (mm)")
-            plt.title(f"Full Timeline Prediction [{model.name}]")
+            plt.title(f"Full Timeline Prediction [{pretty_model(model.name)}]")
             plt.legend()
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
             safe_name = model.name.replace('+', '_').replace(' ', '_')
-            plt.savefig(f"{output_dir}/temporal_full_timeline_{safe_name}.png", dpi=300)
+            plt.savefig(f"{output_dir}/temporal_full_timeline_{safe_name}.png", dpi=600)
             plt.close()
             
             # Plot training loss for neural networks
@@ -456,7 +457,28 @@ def run_temporal_holdout_analysis(
             }
         cv_df = pd.DataFrame(cv_summary).T
         cv_df.to_csv(f"{output_dir}/temporal_cv_results.csv")
-    
+
+    # Statistical outputs: bootstrap CIs, model-comparison significance, split report.
+    from stats_utils import emit_holdout_statistics
+    test_preds = {name: res['y_test_pred'] for name, res in results.items() if 'y_test_pred' in res}
+    if test_preds:
+        emit_holdout_statistics(
+            y_test, test_preds, output_dir, prefix="temporal",
+            dates_train=dates_train, dates_test=dates_test,
+            n_features=len(feature_names), seed=seed,
+        )
+
+    # Temporal closure test: re-aggregate predicted daily TWSA to monthly and
+    # compare against the ORIGINAL observed monthly GRACE (reviewer request for
+    # explicit daily-reconstruction validation via temporal self-consistency).
+    try:
+        from temporal_closure_validation import run_temporal_closure_validation
+        run_temporal_closure_validation(
+            predictions_dir=output_dir, tws_file=tws_file, seed=seed,
+        )
+    except Exception as e:
+        print(f"Temporal closure validation skipped: {e}")
+
     return results
 
 

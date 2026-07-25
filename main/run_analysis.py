@@ -136,7 +136,8 @@ def compare_holdout_methods(results: dict, output_dir: str = "../Results/figures
     """
     import pandas as pd
     import matplotlib.pyplot as plt
-    
+    from plot_style import pretty_model, R2
+
     os.makedirs(output_dir, exist_ok=True)
     
     # Collect metrics
@@ -187,17 +188,18 @@ def compare_holdout_methods(results: dict, output_dir: str = "../Results/figures
             ax.bar([xi + i * width for xi in x], values, width, 
                   label=holdout, color=colors[i], alpha=0.8)
         
+        metric_label = R2 if metric == 'R2' else metric
         ax.set_xlabel('Model')
-        ax.set_ylabel(metric)
-        ax.set_title(f'{metric} Comparison')
+        ax.set_ylabel(metric_label)
+        ax.set_title(f'{metric_label} Comparison')
         ax.set_xticks([xi + width for xi in x])
-        ax.set_xticklabels(models, rotation=45, ha='right')
+        ax.set_xticklabels([pretty_model(m) for m in models], rotation=45, ha='right')
         ax.legend()
         ax.grid(True, alpha=0.3, axis='y')
     
     plt.suptitle('Model Performance Across Holdout Methods', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/holdout_comparison.png", dpi=300)
+    plt.savefig(f"{output_dir}/holdout_comparison.png", dpi=600)
     plt.close()
     
     # Print summary

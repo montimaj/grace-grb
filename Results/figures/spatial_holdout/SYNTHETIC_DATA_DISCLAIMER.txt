@@ -1,0 +1,1 @@
+SYNTHETIC SPATIAL HOLDOUT: replicated basin series + noise; scores reflect sensitivity to added noise, NOT spatial transferability.

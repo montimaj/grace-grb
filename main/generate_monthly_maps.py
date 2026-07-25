@@ -16,6 +16,8 @@ from typing import Dict, List, Tuple, Optional
 import warnings
 warnings.filterwarnings('ignore')
 
+from plot_style import pretty_model, R2
+
 
 # Season definitions
 SEASONS = {
@@ -25,8 +27,15 @@ SEASONS = {
     'Winter (Dec-Mar)': [12, 1, 2, 3]
 }
 
-MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+# Honest labelling: the dataset is a single basin-averaged (spatially integrated)
+# time series, so every map fills the whole basin polygon with one value. These
+# are basin-scale summaries, NOT per-pixel maps. Genuine per-pixel maps would
+# require gridded GRACE + gridded predictors, which this dataset does not contain.
+BASIN_SCALE_NOTE = ("Basin-averaged (spatially integrated) value shown as a uniform "
+                    "basin fill - this is a basin-scale summary, not a per-pixel map.")
 
 
 def load_predictions(predictions_dir: str) -> Dict[str, pd.DataFrame]:
@@ -252,7 +261,7 @@ def plot_monthly_maps(
             'Actual_TWSA': 'Actual',
             'Residual': 'Residual (Actual - Predicted)'
         }
-        fig.suptitle(f"Monthly Average {title_map.get(data_type, data_type)} TWS - {model_name}", 
+        fig.suptitle(f"Monthly Average {title_map.get(data_type, data_type)} TWS - {pretty_model(model_name)}", 
                     fontsize=14, fontweight='bold', y=0.98)
         
         plt.tight_layout(rect=[0, 0, 1, 0.92])
@@ -263,10 +272,12 @@ def plot_monthly_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
+        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
+                 fontsize=8, style='italic', color='0.35')
         
         safe_name = model_name.replace('+', '_').replace(' ', '_')
         plt.savefig(f"{output_dir}/monthly_maps_{data_type.lower()}_{safe_name}.png", 
-                   dpi=300, bbox_inches='tight')
+                   dpi=600, bbox_inches='tight')
         plt.close()
         
         print(f"Saved monthly maps for {model_name} ({data_type})")
@@ -339,7 +350,7 @@ def plot_seasonal_maps(
             'Actual_TWSA': 'Actual',
             'Residual': 'Residual (Actual - Predicted)'
         }
-        fig.suptitle(f"Seasonal Average {title_map.get(data_type, data_type)} TWS - {model_name}", 
+        fig.suptitle(f"Seasonal Average {title_map.get(data_type, data_type)} TWS - {pretty_model(model_name)}", 
                     fontsize=14, fontweight='bold', y=0.98)
         
         plt.tight_layout(rect=[0, 0, 1, 0.90])
@@ -350,10 +361,12 @@ def plot_seasonal_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
+        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
+                 fontsize=8, style='italic', color='0.35')
         
         safe_name = model_name.replace('+', '_').replace(' ', '_')
         plt.savefig(f"{output_dir}/seasonal_maps_{data_type.lower()}_{safe_name}.png", 
-                   dpi=300, bbox_inches='tight')
+                   dpi=600, bbox_inches='tight')
         plt.close()
         
         print(f"Saved seasonal maps for {model_name} ({data_type})")
@@ -416,7 +429,7 @@ def plot_model_comparison_maps(
                 linewidth=0.5
             )
             
-            ax.set_title(f"{model_name}\n{value:.1f} mm", fontsize=10, fontweight='bold')
+            ax.set_title(f"{pretty_model(model_name)}\n{value:.1f} mm", fontsize=10, fontweight='bold')
             ax.axis('off')
         
         # Hide extra axes
@@ -435,9 +448,11 @@ def plot_model_comparison_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
+        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
+                 fontsize=8, style='italic', color='0.35')
         
         plt.savefig(f"{output_dir}/model_comparison_{MONTH_NAMES[month-1].lower()}.png", 
-                   dpi=300, bbox_inches='tight')
+                   dpi=600, bbox_inches='tight')
         plt.close()
     
     print(f"Saved model comparison maps for all months")
@@ -500,7 +515,7 @@ def plot_seasonal_comparison_maps(
                 linewidth=0.5
             )
             
-            ax.set_title(f"{model_name}\n{value:.1f} mm", fontsize=10, fontweight='bold')
+            ax.set_title(f"{pretty_model(model_name)}\n{value:.1f} mm", fontsize=10, fontweight='bold')
             ax.axis('off')
         
         # Hide extra axes
@@ -522,9 +537,11 @@ def plot_seasonal_comparison_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
+        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
+                 fontsize=8, style='italic', color='0.35')
         
         plt.savefig(f"{output_dir}/model_comparison_{season_short.lower()}.png", 
-                   dpi=300, bbox_inches='tight')
+                   dpi=600, bbox_inches='tight')
         plt.close()
     
     print(f"Saved model comparison maps for all seasons")
@@ -555,7 +572,7 @@ def plot_annual_cycle(
     for i, (model_name, monthly) in enumerate(monthly_avgs.items()):
         monthly_sorted = monthly.sort_values('Month')
         ax1.plot(monthly_sorted['Month'], monthly_sorted['Predicted_TWSA'], 
-                'o-', label=model_name, color=colors[i], linewidth=2, markersize=6)
+                'o-', label=pretty_model(model_name), color=colors[i], linewidth=2, markersize=6)
     
     # Add actual TWS (should be same for all models)
     first_model = list(monthly_avgs.keys())[0]
@@ -585,7 +602,7 @@ def plot_annual_cycle(
     for i, (model_name, monthly) in enumerate(monthly_avgs.items()):
         monthly_sorted = monthly.sort_values('Month')
         ax2.plot(monthly_sorted['Month'], monthly_sorted['Residual'], 
-                'o-', label=model_name, color=colors[i], linewidth=2, markersize=6)
+                'o-', label=pretty_model(model_name), color=colors[i], linewidth=2, markersize=6)
     
     ax2.axhline(0, color='black', linestyle='-', linewidth=1)
     ax2.set_xlabel('Month', fontsize=12)
@@ -597,7 +614,7 @@ def plot_annual_cycle(
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/annual_cycle_comparison.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{output_dir}/annual_cycle_comparison.png", dpi=600, bbox_inches='tight')
     plt.close()
     
     print("Saved annual cycle comparison plot")
@@ -660,7 +677,7 @@ def plot_monthly_time_series(
         ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
         ax.set_title(f"{MONTH_NAMES[month_idx]}", fontsize=11, fontweight='bold')
         ax.set_xticks(x_positions)
-        ax.set_xticklabels([m.replace('+', '\n+') for m in model_names], 
+        ax.set_xticklabels([pretty_model(m).replace(' + ', '\n+') for m in model_names], 
                           rotation=45, ha='right', fontsize=8)
         ax.set_ylabel('TWS (mm)', fontsize=9)
         ax.grid(True, alpha=0.3, axis='y')
@@ -672,7 +689,7 @@ def plot_monthly_time_series(
                 fontsize=14, fontweight='bold', y=1.01)
     plt.tight_layout()
     plt.savefig(f"{output_dir}/monthly_time_series_all_months.png", 
-               dpi=300, bbox_inches='tight')
+               dpi=600, bbox_inches='tight')
     plt.close()
     
     print("Saved monthly time series comparison plot")
@@ -735,7 +752,7 @@ def plot_seasonal_time_series(
         ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
         ax.set_title(f"{season_name}", fontsize=12, fontweight='bold')
         ax.set_xticks(x_positions)
-        ax.set_xticklabels([m.replace('+', '\n+') for m in model_names], 
+        ax.set_xticklabels([pretty_model(m).replace(' + ', '\n+') for m in model_names], 
                           rotation=45, ha='right', fontsize=9)
         ax.set_ylabel('TWS Anomaly (mm)', fontsize=10)
         ax.grid(True, alpha=0.3, axis='y')
@@ -747,7 +764,7 @@ def plot_seasonal_time_series(
                 fontsize=14, fontweight='bold', y=1.01)
     plt.tight_layout()
     plt.savefig(f"{output_dir}/seasonal_time_series_all_seasons.png", 
-               dpi=300, bbox_inches='tight')
+               dpi=600, bbox_inches='tight')
     plt.close()
     
     print("Saved seasonal time series comparison plot")
@@ -807,7 +824,7 @@ def plot_model_time_series_with_std(
                linewidth=2, markersize=6, label='Predicted')
         
         ax.axhline(0, color='gray', linestyle='--', linewidth=0.5)
-        ax.set_title(f"{model_name}", fontsize=11, fontweight='bold')
+        ax.set_title(f"{pretty_model(model_name)}", fontsize=11, fontweight='bold')
         ax.set_xlabel('Month', fontsize=10)
         ax.set_ylabel('TWS Anomaly (mm)', fontsize=10)
         ax.set_xticks(range(1, 13))
@@ -823,7 +840,7 @@ def plot_model_time_series_with_std(
                 fontsize=14, fontweight='bold', y=1.01)
     plt.tight_layout()
     plt.savefig(f"{output_dir}/model_monthly_cycles_with_std.png", 
-               dpi=300, bbox_inches='tight')
+               dpi=600, bbox_inches='tight')
     plt.close()
     
     print("Saved model monthly cycles with std dev plot")
@@ -889,7 +906,7 @@ def plot_seasonal_cycle_with_std(
                    capsize=5, capthick=2, label='Predicted ± Std')
         
         ax.axhline(0, color='gray', linestyle='--', linewidth=0.5)
-        ax.set_title(f"{model_name}", fontsize=11, fontweight='bold')
+        ax.set_title(f"{pretty_model(model_name)}", fontsize=11, fontweight='bold')
         ax.set_xlabel('Season', fontsize=10)
         ax.set_ylabel('TWS Anomaly (mm)', fontsize=10)
         ax.set_xticks(x_positions)
@@ -905,7 +922,7 @@ def plot_seasonal_cycle_with_std(
                 fontsize=14, fontweight='bold', y=1.01)
     plt.tight_layout()
     plt.savefig(f"{output_dir}/model_seasonal_cycles_with_std.png", 
-               dpi=300, bbox_inches='tight')
+               dpi=600, bbox_inches='tight')
     plt.close()
     
     print("Saved model seasonal cycles with std dev plot")
