@@ -1,4 +1,4 @@
-# Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin
+# Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin
 
 A comprehensive framework for downscaling GRACE Terrestrial Water Storage (TWS) data using multiple machine learning models with different holdout validation strategies.
 
@@ -27,7 +27,7 @@ This framework provides a unified interface for training and evaluating multiple
 
 - **Random Holdout**: Standard random train-test split
 - **Temporal Holdout**: Time-based split maintaining chronological order
-- **Spatial Holdout**: Location-based split for evaluating spatial generalization
+- **Spatial Holdout**: Location-based split on *synthetic* replicated data (a noise-sensitivity demonstration, not real spatial generalisation; see [Scope and Limitations](#scope-and-limitations-please-read-before-interpreting-results))
 
 ---
 
@@ -46,16 +46,16 @@ This framework is designed for **basin-scale temporal analysis** of Terrestrial 
    - Units: millimeters (mm) of equivalent water height
    - Time Period: 2002–present (with data gaps during satellite transitions)
 
-2. **Predictor Variables (Features)**
-   - Derived from GLDAS (Global Land Data Assimilation System) via Google Earth Engine
-   - Variables include:
-     - **SMS**: Soil Moisture Storage (mm)
-     - **ET**: Evapotranspiration (mm)
-     - **Rainfall**: Precipitation (mm)
-     - **Runoff**: Surface and subsurface runoff (mm)
-     - **GWSA**: Groundwater Storage Anomaly (mm) - computed as residual or from models
-   - Temporal Resolution: Daily (aggregated to monthly)
-   - Spatial Representation: Basin-averaged values
+2. **Predictor Variables (Features)** (downloaded via Google Earth Engine; see `gee_download.py` for the exact collections)
+   - **SMS**: Soil Moisture Storage (mm) : NASA GLDAS (`NASA/GLDAS/...`)
+   - **ET**: Evapotranspiration (mm) : NASA GLDAS
+   - **Rainfall**: Precipitation (mm) : **ERA5-Land** (`ECMWF/ERA5_LAND/DAILY_AGGR`), not GPM/GLDAS
+   - **Runoff**: Surface/subsurface runoff (mm) : **ERA5-Land**, not GLDAS
+   - **GWSA**: Groundwater Storage Anomaly (mm) : derived from CGWB / India-WRIS groundwater records
+   - Temporal Resolution: **Daily** (the predictors are used at native daily resolution; the monthly GRACE target is interpolated to daily, not the other way around)
+   - Spatial Representation: Basin-averaged (spatially integrated) values
+
+   > Note: precipitation and surface runoff come from ERA5-Land (verified: the `rainfall` and `runoff` columns correlate 1.00 with the ERA5 fields), while soil moisture and ET come from GLDAS. The revised manuscript (Table 1) matches this.
 
 ### Downscaling Approach
 
@@ -71,13 +71,13 @@ The downscaling framework employs a **data-driven machine learning approach** to
 
 $$X_t^{(lag)} = [X_{t}, X_{t-1}, X_{t-2}, \ldots, X_{t-k}]$$
 
-where $k$ is the lag period (default: 3 months). This allows models to learn how antecedent conditions influence current TWS.
+where $k$ is the number of lag steps (code default: `lags=7`, i.e. a 7-day window on the daily predictors). This allows models to learn how antecedent conditions influence current TWS. (The revised manuscript describes this 7-day lag window consistently.)
 
-**Standardization**: All features are standardized using z-score normalization:
+**Feature scaling**: All features (and the target) are scaled to the range [0, 1] using min-max normalization (`MinMaxScaler`), which is what the code actually applies:
 
-$$\hat{X} = \frac{X - \mu}{\sigma}$$
+$$\hat{X} = \frac{X - X_{\min}}{X_{\max} - X_{\min}}$$
 
-where $\mu$ and $\sigma$ are computed from the training set only to prevent data leakage.
+where $X_{\min}$ and $X_{\max}$ are computed from the training set only to prevent data leakage. (The revised manuscript describes this min-max scaling consistently.)
 
 ### Machine Learning Models
 
@@ -194,8 +194,8 @@ Model performance is assessed using multiple complementary metrics:
 |--------|---------|----------------|
 | **MAE** | $\frac{1}{n}\sum_{i=1}^{n}\|y_i - \hat{y}_i\|$ | Average absolute error (mm) |
 | **RMSE** | $\sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}$ | Root mean squared error (mm) |
-| **R²** | $\left(\dfrac{\sum(y_i-\bar{y})(\hat{y}_i-\bar{\hat{y}})}{\sqrt{\sum(y_i-\bar{y})^2}\,\sqrt{\sum(\hat{y}_i-\bar{\hat{y}})^2}}\right)^2$ | **Squared Pearson correlation** — linear association, insensitive to bias/scale (0–1) |
-| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | Nash-Sutcliffe Efficiency — skill *including* bias |
+| **R²** | $\left(\dfrac{\sum(y_i-\bar{y})(\hat{y}_i-\bar{\hat{y}})}{\sqrt{\sum(y_i-\bar{y})^2}\,\sqrt{\sum(\hat{y}_i-\bar{\hat{y}})^2}}\right)^2$ | **Squared Pearson correlation**: linear association, insensitive to bias/scale (0–1) |
+| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | Nash-Sutcliffe Efficiency: skill *including* bias |
 | **PBIAS** | $\frac{\sum(\hat{y}_i - y_i)}{\sum y_i} \times 100$ | Percent bias (%) |
 
 > **Note on R² vs NSE.** These are now **distinct** metrics. Earlier code computed
@@ -216,23 +216,40 @@ Model performance is assessed using multiple complementary metrics:
 
 Three modules add the inferential and validation layers needed for publication-grade reporting. They run automatically at the end of each holdout analysis and can also be invoked standalone.
 
-**`stats_utils.py` — uncertainty and significance**
-- `block_bootstrap_metric_cis` — 95% confidence intervals for MAE, RMSE, R², NSE, PBIAS via a **moving-block bootstrap** that respects temporal autocorrelation (block length auto-selected from the residual ACF).
-- `diebold_mariano` — Diebold–Mariano test (HLN small-sample correction, Newey–West HAC variance) for **whether two models differ significantly** in accuracy; plus `wilcoxon_abs_error` and `paired_bootstrap_metric_diff`.
-- `model_comparison_matrix` / `rank_models_with_significance` — pairwise significance and a best-model ranking.
-- `blocked_kfold_indices`, `purged_kfold_indices`, `compare_cv_leakage` — **leakage-aware cross-validation** contrasting shuffled, blocked and purged+embargoed schemes.
-- `describe_split`, `repeated_cv` — exact split sizes/date ranges and multi-seed repeated CV.
+**`stats_utils.py`: uncertainty and significance**
+- `block_bootstrap_metric_cis`: 95% confidence intervals for MAE, RMSE, R², NSE, PBIAS via a **moving-block bootstrap** that respects temporal autocorrelation (block length auto-selected from the residual ACF).
+- `diebold_mariano`: Diebold–Mariano test (HLN small-sample correction, Newey–West HAC variance) for **whether two models differ significantly** in accuracy; plus `wilcoxon_abs_error` and `paired_bootstrap_metric_diff`.
+- `model_comparison_matrix` / `rank_models_with_significance`: pairwise significance and a best-model ranking.
+- `blocked_kfold_indices`, `purged_kfold_indices`, `compare_cv_leakage`: **leakage-aware cross-validation** contrasting shuffled, blocked and purged+embargoed schemes.
+- `describe_split`, `repeated_cv`: exact split sizes/date ranges and multi-seed repeated CV.
 
-**`temporal_closure_validation.py` — daily→monthly closure**
+**`temporal_closure_validation.py`: daily→monthly closure**
 Re-aggregates each model's predicted **daily** TWSA to monthly means and compares against the **original observed monthly GRACE** (`TWS_JPL.xlsx`, observed months only), with bootstrap CIs and figures. This is the appropriate check for daily-scale consistency when the ground truth exists only at monthly resolution.
 
-**`analyze_results.py` — driver**
+**`analyze_results.py`: driver**
 Produces all of the above from saved predictions without retraining, plus the leakage diagnostic:
 ```bash
 python analyze_results.py --holdout-dir ../Results/figures/temporal_holdout   # CIs + DM significance
 python analyze_results.py --leakage --models randomforest xgboost             # random vs blocked vs purged
 python temporal_closure_validation.py --predictions-dir ../Results/figures/temporal_holdout
 ```
+
+### Hyperparameter Tuning (Optuna)
+
+`tune_hyperparameters.py` performs Bayesian hyperparameter optimisation for every model with **Optuna** (TPE sampler + median pruner). The search minimises RMSE over **walk-forward (`TimeSeriesSplit`) cross-validation on the training data only**, so it respects temporal ordering and never touches the held-out test period.
+
+```bash
+# tune the fast tree models (writes ../Results/tuning/best_params.json)
+python tune_hyperparameters.py --models randomforest xgboost lightgbm --trials 60
+
+# tune neural nets (slower; fewer trials, capped epochs, pruning). Merges into the same JSON
+python tune_hyperparameters.py --models lstm bilstm bilstm_attention --nn-trials 20 --nn-epochs-max 30
+
+# then run any holdout using the tuned hyperparameters
+python run_analysis.py --analysis all --compare --tuned-params ../Results/tuning/best_params.json
+```
+
+The JSON records, per model, the best parameters, the tuned-vs-default CV RMSE and the number of completed/pruned trials. The runners accept a `tuned_params` dict (loaded via `load_tuned_params`), so tuning is fully opt-in; without `--tuned-params` the documented library defaults are used.
 
 ### Scope and Limitations (please read before interpreting results)
 
@@ -293,7 +310,7 @@ Open Linux/Mac terminal or Windows PowerShell and run the following:
 ```
 conda create -y -n grace-grb python=3.12
 conda activate grace-grb
-conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap
+conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap optuna
 ```
 
 ### Required Data Files
@@ -319,9 +336,10 @@ main/
 ├── stats_utils.py            # Bootstrap CIs, DM/Wilcoxon significance, leakage-aware CV, split reports
 ├── temporal_closure_validation.py  # Daily→monthly temporal closure test vs original monthly GRACE
 ├── analyze_results.py        # Post-hoc CIs + model-comparison significance + leakage diagnostic
+├── tune_hyperparameters.py   # Optuna hyperparameter tuning (walk-forward CV on training data)
 ├── plot_style.py             # Central figure styling (600 DPI, clean labels, R² superscript)
 ├── Data/
-│   ├── All_Data.xlsx         # Input features (GLDAS variables)
+│   ├── All_Data.xlsx         # Input features (ERA5-Land + GLDAS variables)
 │   ├── TWS_JPL.xlsx          # Target variable (GRACE TWS)
 │   └── Ganga Basin Shapefile/
 │       └── Ganga_basin.shp   # Basin boundary for visualization
@@ -1085,5 +1103,5 @@ for name, result in results.items():
 ```
 
 ## Citation
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2026). Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin. _In prep. for Journal of Hydrology: Regional Studies._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin. _Submitted to Groundwater for Sustainable Development._
 

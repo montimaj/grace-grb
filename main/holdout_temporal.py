@@ -229,6 +229,7 @@ def run_temporal_holdout_analysis(
     train_end_year: int = None,
     seed: int = 20,
     models_to_run: List[str] = None,
+    tuned_params: dict = None,
     verbose: bool = True,
     run_cv: bool = False,
     cv_splits: int = 5,
@@ -328,7 +329,7 @@ def run_temporal_holdout_analysis(
         try:
             start_time = time.time()
             
-            model = get_model(model_name, seed=seed)
+            model = get_model(model_name, seed=seed, **((tuned_params or {}).get(model_name, {})))
             model.fit(X_train, y_train, verbose=verbose)
             
             train_time = time.time() - start_time

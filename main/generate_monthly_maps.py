@@ -585,17 +585,22 @@ def plot_annual_cycle(
     ax1.set_title('Annual Cycle of TWS Predictions', fontsize=12, fontweight='bold')
     ax1.set_xticks(range(1, 13))
     ax1.set_xticklabels(MONTH_NAMES, rotation=45)
-    ax1.legend(loc='best', fontsize=9)
     ax1.grid(True, alpha=0.3)
     ax1.axhline(0, color='gray', linestyle='-', linewidth=0.5)
-    
+
     # Add seasonal shading
     season_colors = {'Pre-Monsoon (Apr-Jun)': 'yellow', 'Monsoon (Jul-Sep)': 'green',
                     'Post-Monsoon (Oct-Nov)': 'orange', 'Winter (Dec-Mar)': 'lightblue'}
     for season, months in SEASONS.items():
         for m in months:
-            ax1.axvspan(m - 0.5, m + 0.5, alpha=0.1, 
+            ax1.axvspan(m - 0.5, m + 0.5, alpha=0.1,
                        color=season_colors.get(season, 'gray'))
+    # Legend: model lines plus a labelled swatch for each seasonal band, so the
+    # background shading is explained rather than left as unlabelled colour.
+    season_handles = [Patch(facecolor=c, alpha=0.1, label=s)
+                      for s, c in season_colors.items()]
+    line_handles, _ = ax1.get_legend_handles_labels()
+    ax1.legend(handles=line_handles + season_handles, loc='best', fontsize=8, ncol=2)
     
     # Plot residuals
     ax2 = axes[1]

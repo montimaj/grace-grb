@@ -39,9 +39,10 @@ from utils import (
 from stats_utils import (
     METRIC_NAMES, block_bootstrap_metric_cis, metric_ci_dataframe,
     model_comparison_matrix, rank_models_with_significance,
+    pairwise_dm_comparison_table,
     paired_bootstrap_metric_diff, compare_cv_leakage, describe_split,
 )
-from plot_style import DPI, R2, pretty_model, pretty_scheme
+from plot_style import DPI, R2, R2_BOLD, pretty_model, pretty_scheme, BAR, BAR_3
 
 
 def _model_name_from_file(path: str) -> str:
@@ -98,6 +99,8 @@ def plot_metrics_with_cis(
 
     panel_metrics = ["R2", "NSE", "RMSE", "MAE"]
     metric_label = {"R2": R2, "NSE": "NSE", "RMSE": "RMSE", "MAE": "MAE"}
+    # Bold-weight labels for the (bold) panel titles, so R2 does not render thin.
+    metric_label_bold = {"R2": R2_BOLD, "NSE": "NSE", "RMSE": "RMSE", "MAE": "MAE"}
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     axes = axes.flatten()
     for ax, metric in zip(axes, panel_metrics):
@@ -107,13 +110,13 @@ def plot_metrics_with_cis(
         lo = sub["lower"].values
         hi = sub["upper"].values
         x = np.arange(len(labels))
-        ax.bar(x, pts, color="#4c72b0", alpha=0.85,
-               yerr=[pts - lo, hi - pts], capsize=4)
+        ax.bar(x, pts, color=BAR, alpha=0.9,
+               yerr=[pts - lo, hi - pts], capsize=4, ecolor="#0b0b0b")
         ax.set_xticks(x)
         ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=9)
         unit = " (mm)" if metric in ("RMSE", "MAE") else ""
         ax.set_ylabel(f"{metric_label[metric]}{unit}")
-        ax.set_title(f"{metric_label[metric]} with 95% block-bootstrap CI", fontweight="bold")
+        ax.set_title(f"{metric_label_bold[metric]} with 95% block-bootstrap CI", fontweight="bold")
         ax.grid(True, alpha=0.3, axis="y")
     plt.suptitle("Test-set performance with bootstrap confidence intervals",
                  fontsize=14, fontweight="bold")
@@ -152,7 +155,9 @@ def model_significance(
 
     dm_matrix = model_comparison_matrix(y_true, aligned, loss=loss)
     ranked = rank_models_with_significance(y_true, aligned, loss=loss, alpha=alpha)
-    return {"dm_matrix": dm_matrix, "ranked": ranked, "n_common": len(common)}
+    comparison = pairwise_dm_comparison_table(y_true, aligned, loss=loss, alpha=alpha)
+    return {"dm_matrix": dm_matrix, "ranked": ranked,
+            "comparison": comparison, "n_common": len(common)}
 
 
 def best_vs_rest_rmse_diff(
@@ -255,29 +260,36 @@ def run_leakage_diagnostic(
 
     # Figure: R-squared by scheme per model.
     r2 = out[out["Metric"] == "R2"]
-    models_u = r2["Model"].unique()
+    models_u = out["Model"].unique()
     schemes = ["random_shuffled", "blocked", "purged_embargo"]
-    colors = {"random_shuffled": "#e74c3c", "blocked": "#f39c12", "purged_embargo": "#2ecc71"}
-    fig, ax = plt.subplots(figsize=(1.8 * len(models_u) + 4, 5))
+    colors = {"random_shuffled": BAR_3[0], "blocked": BAR_3[1], "purged_embargo": BAR_3[2]}
     width = 0.25
     x = np.arange(len(models_u))
-    for i, sch in enumerate(schemes):
-        means = [r2[(r2["Model"] == m) & (r2["Scheme"] == sch)]["Mean"].values[0]
-                 if not r2[(r2["Model"] == m) & (r2["Scheme"] == sch)].empty else np.nan
-                 for m in models_u]
-        stds = [r2[(r2["Model"] == m) & (r2["Scheme"] == sch)]["Std"].values[0]
-                if not r2[(r2["Model"] == m) & (r2["Scheme"] == sch)].empty else 0
-                for m in models_u]
-        ax.bar(x + (i - 1) * width, means, width, yerr=stds, capsize=3,
-               label=pretty_scheme(sch), color=colors[sch], alpha=0.85)
-    ax.set_xticks(x)
-    ax.set_xticklabels([pretty_model(m) for m in models_u])
-    ax.set_ylabel(f"Cross-validated {R2}")
-    ax.set_title(f"Random-split optimism: shuffled vs blocked vs purged + embargo CV",
+
+    # Two panels: R2 (correlation, partly survives) and NSE (efficiency, collapses).
+    fig, axes = plt.subplots(1, 2, figsize=(2.0 * len(models_u) + 7, 5), sharex=True)
+    panel_specs = [("R2", f"Cross-validated {R2}"), ("NSE", "Cross-validated NSE")]
+    for ax, (metric, ylabel) in zip(axes, panel_specs):
+        sub = out[out["Metric"] == metric]
+        for i, sch in enumerate(schemes):
+            means = [sub[(sub["Model"] == m) & (sub["Scheme"] == sch)]["Mean"].values[0]
+                     if not sub[(sub["Model"] == m) & (sub["Scheme"] == sch)].empty else np.nan
+                     for m in models_u]
+            stds = [sub[(sub["Model"] == m) & (sub["Scheme"] == sch)]["Std"].values[0]
+                    if not sub[(sub["Model"] == m) & (sub["Scheme"] == sch)].empty else 0
+                    for m in models_u]
+            ax.bar(x + (i - 1) * width, means, width, yerr=stds, capsize=3,
+                   label=pretty_scheme(sch), color=colors[sch], alpha=0.9, ecolor="#0b0b0b")
+        ax.set_xticks(x)
+        ax.set_xticklabels([pretty_model(m) for m in models_u])
+        ax.set_ylabel(ylabel)
+        ax.axhline(0, color="#0b0b0b", lw=0.8)
+        ax.grid(True, alpha=0.3, axis="y")
+    axes[0].set_title("Correlation partly survives", fontsize=11)
+    axes[1].set_title("Efficiency collapses (NSE < 0)", fontsize=11)
+    axes[0].legend(title="Cross-validation scheme", fontsize=9)
+    fig.suptitle("Random-split optimism from temporal autocorrelation: shuffled vs blocked vs purged + embargo CV",
                  fontweight="bold")
-    ax.axhline(0, color="black", lw=0.8)
-    ax.legend()
-    ax.grid(True, alpha=0.3, axis="y")
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "cv_leakage_comparison.png"), dpi=DPI)
     plt.close()
@@ -311,6 +323,7 @@ def analyze_holdout(
     sig = model_significance(preds)
     sig["dm_matrix"].to_csv(os.path.join(output_dir, "dm_pairwise_pvalues.csv"))
     sig["ranked"].to_csv(os.path.join(output_dir, "model_ranking_significance.csv"), index=False)
+    sig["comparison"].to_csv(os.path.join(output_dir, "dm_comparison_table.csv"), index=False)
 
     diff = best_vs_rest_rmse_diff(preds, n_boot=n_boot, seed=seed)
     diff.to_csv(os.path.join(output_dir, "best_vs_rest_rmse_diff.csv"), index=False)

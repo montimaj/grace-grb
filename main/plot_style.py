@@ -13,10 +13,33 @@ from __future__ import annotations
 
 DPI = 600
 
-# Matplotlib mathtext for axis labels / titles.
-R2 = r"$R^2$"
+# Matplotlib mathtext for axis labels / titles. \mathrm keeps the R UPRIGHT
+# (a plain $R^2$ renders the R in maths italic, which is not wanted here).
+R2 = r"$\mathrm{R}^{2}$"
+# Bold-weight variant for use inside BOLD titles: matplotlib mathtext does NOT
+# inherit a title's fontweight, so \mathrm renders normal-weight next to bold
+# words. \mathbf keeps R and the exponent upright AND bold, matching the title.
+R2_BOLD = r"$\mathbf{R^{2}}$"
 # Plain-text (console, CSV, markdown) superscript.
 R2_TXT = "R²"
+
+# Scientific, colour-blind-safe categorical palette (publication quality).
+# Blue / orange / aqua lead; this ordering is validated all-pairs for CVD.
+SCI_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100",
+              "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+SCI_BLUE, SCI_ORANGE, SCI_AQUA = "#2a78d6", "#eb6834", "#1baf7a"
+SCI_INK = "#0b0b0b"       # primary text
+SCI_MUTED = "#898781"     # axes / muted labels
+SCI_GRID = "#e1e0d9"      # hairline gridlines
+
+# Seaborn "deep" default palette leads (blue, orange, green). Used as a single,
+# consistent scheme for the error-metric bar plots: a single series is blue,
+# a two-category contrast (train/test, default/tuned) is blue vs orange, and a
+# three-category contrast (holdout, CV scheme) is blue/orange/green.
+SB_BLUE, SB_ORANGE, SB_GREEN = "#4C72B0", "#DD8452", "#55A868"
+BAR = SB_BLUE                                    # single series
+BAR_2 = [SB_BLUE, SB_ORANGE]                     # two ordered categories
+BAR_3 = [SB_BLUE, SB_ORANGE, SB_GREEN]           # three ordered categories
 
 # Canonical model keys (as used in prediction filenames) -> display names.
 _MODEL_DISPLAY = {

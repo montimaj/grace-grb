@@ -11,7 +11,7 @@ Model: BiLSTM+Attention
   R²:    0.7205
   NSE:   0.7186
   PBIAS: 3.74%
-  Training Time: 23.29s
+  Training Time: 24.53s
 
 ----------------------------------------
 Model: BiLSTM
@@ -21,7 +21,7 @@ Model: BiLSTM
   R²:    0.6735
   NSE:   0.6632
   PBIAS: 2.56%
-  Training Time: 20.20s
+  Training Time: 24.16s
 
 ----------------------------------------
 Model: LSTM
@@ -31,7 +31,7 @@ Model: LSTM
   R²:    0.6782
   NSE:   0.6458
   PBIAS: -27.84%
-  Training Time: 11.28s
+  Training Time: 11.73s
 
 ----------------------------------------
 Model: XGBoost
@@ -51,7 +51,7 @@ Model: LightGBM
   R²:    0.7737
   NSE:   0.7734
   PBIAS: 0.31%
-  Training Time: 0.62s
+  Training Time: 0.60s
 
 ----------------------------------------
 Model: RandomForest
@@ -61,7 +61,7 @@ Model: RandomForest
   R²:    0.7964
   NSE:   0.7958
   PBIAS: -0.24%
-  Training Time: 1.08s
+  Training Time: 1.09s
 
 ============================================================
 Report generated successfully

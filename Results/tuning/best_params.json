@@ -1,0 +1,102 @@
+{
+  "randomforest": {
+    "best_params": {
+      "n_estimators": 200,
+      "max_depth": 17,
+      "min_samples_split": 5,
+      "min_samples_leaf": 10,
+      "max_features": 0.5406851875436189
+    },
+    "best_cv_rmse": 9.09553432903395,
+    "default_cv_rmse": 9.083811472337327,
+    "improvement_pct": -0.12905217960897974,
+    "n_trials": 50,
+    "n_complete": 22,
+    "n_pruned": 28,
+    "cv": "TimeSeriesSplit(n_splits=4)"
+  },
+  "xgboost": {
+    "best_params": {
+      "n_estimators": 600,
+      "max_depth": 9,
+      "learning_rate": 0.008484449838986658,
+      "subsample": 0.6235224592638599,
+      "colsample_bytree": 0.7494344496451264,
+      "min_child_weight": 6,
+      "reg_alpha": 7.847128900828844e-05,
+      "reg_lambda": 0.06285249552688979
+    },
+    "best_cv_rmse": 8.974103262041396,
+    "default_cv_rmse": 9.075223443183445,
+    "improvement_pct": 1.1142445337585807,
+    "n_trials": 50,
+    "n_complete": 36,
+    "n_pruned": 14,
+    "cv": "TimeSeriesSplit(n_splits=4)"
+  },
+  "lightgbm": {
+    "best_params": {
+      "n_estimators": 600,
+      "num_leaves": 63,
+      "max_depth": 5,
+      "learning_rate": 0.09100738050695635,
+      "subsample": 0.7038540293434072,
+      "colsample_bytree": 0.8677798134243169,
+      "min_child_samples": 89,
+      "reg_alpha": 0.0009086273931183577,
+      "reg_lambda": 0.019423019648802668
+    },
+    "best_cv_rmse": 8.895017377228768,
+    "default_cv_rmse": 8.985890295442179,
+    "improvement_pct": 1.0112845274719502,
+    "n_trials": 50,
+    "n_complete": 24,
+    "n_pruned": 26,
+    "cv": "TimeSeriesSplit(n_splits=4)"
+  },
+  "lstm": {
+    "best_params": {
+      "hidden_size": 32,
+      "learning_rate": 0.002418327773071802,
+      "epochs": 25,
+      "batch_size": 32
+    },
+    "best_cv_rmse": 9.455015651209793,
+    "default_cv_rmse": 11.094778610743832,
+    "improvement_pct": 14.779591527370762,
+    "n_trials": 15,
+    "n_complete": 11,
+    "n_pruned": 4,
+    "cv": "TimeSeriesSplit(n_splits=3)"
+  },
+  "bilstm": {
+    "best_params": {
+      "hidden_size": 16,
+      "learning_rate": 0.0043715880746763,
+      "epochs": 25,
+      "batch_size": 32
+    },
+    "best_cv_rmse": 9.475924478353525,
+    "default_cv_rmse": 10.02583080512027,
+    "improvement_pct": 5.4848953414005726,
+    "n_trials": 15,
+    "n_complete": 12,
+    "n_pruned": 3,
+    "cv": "TimeSeriesSplit(n_splits=3)"
+  },
+  "bilstm_attention": {
+    "best_params": {
+      "hidden_size": 128,
+      "learning_rate": 0.0029941907755461944,
+      "epochs": 25,
+      "batch_size": 16
+    },
+    "best_cv_rmse": 9.0402785231041,
+    "default_cv_rmse": 9.871387028867398,
+    "improvement_pct": 8.419369064680025,
+    "n_trials": 15,
+    "n_complete": 11,
+    "n_pruned": 4,
+    "cv": "TimeSeriesSplit(n_splits=3)"
+  }
+}

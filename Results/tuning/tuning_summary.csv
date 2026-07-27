@@ -1,0 +1,7 @@
+Model,Default CV RMSE (mm),Tuned CV RMSE (mm),Improvement (%),Trials (complete/pruned)
+Random Forest,9.084,9.096,-0.1,22/28
+XGBoost,9.075,8.974,1.1,36/14
+LightGBM,8.986,8.895,1.0,24/26
+LSTM,11.095,9.455,14.8,11/4
+BiLSTM,10.026,9.476,5.5,12/3
+BiLSTM + Attention,9.871,9.04,8.4,11/4

@@ -1,18 +1,10 @@
-# Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin
+# Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin
 
 ## Citation
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Banerjee, S., Kumar, Y. S., & Thakur, P. K. (2026). Explainable Artificial intelligence Based Temporal Downscaling and Forecasting of Terrestrial Water Storage Using Hydroclimatic Data in Ganges River Basin. _Submitted to Groundwater for Sustainable Development._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin. _Submitted to Groundwater for Sustainable Development._
 
 ## Abstract
-The climate of our planet is going through rapid and unforeseen changes, resulting in increased frequency, duration, and severity of droughts, which have enduring effects on flora and fauna, ecosystems, communities, and individuals. Therefore, monitoring climate patterns in various places has become increasingly significant. 
-Additionally, water resources are changing at an unprecedented rate, with the dry areas getting drier and the wet wetter. These changes are strongly dependent on extreme climate events such as droughts and floods. 
-Thus, hydrological dynamics assessment and its association with climate teleconnections during major hydrological events is highly important and required for the basin. Ongoing technological advances in remote sensing methods, have successfully used gravity data provided by the Gravity Recovery and Climate Experiment (GRACE) and its successor GRACE Follow-On (GRACE-FO) missions to assess the variability of terrestrial water storage (TWS). 
-In our study, we apply GRACEderived TWS anomalies to characterize trends and variations of water storage across different seasonal and meteorological periods such as monsoon and spring in the Ganges River basin. The Ganges River basin covers 26% of India’s land area and plays a critical role in supporting the food and water security of this region. 
-To predict and assess TWS changes for the upcoming years and to derive daily TWS changes, we rely on machine learning and deep learning methods such as extra gradient boosting and long short-term memory (LSTM) for monthly GRACE-derived TWS. We assess the reliability of obtained results by comparison to daily GRACE Institute of Geodesy at Graz University of Technology (ITSG) solutions. 
-The impact of climate teleconnections such as El NiñoSouthern Oscillation (ENSO) and Niño 3.4 on TWS changes is also investigated to improve the understanding of hydrological dynamics during extreme climatic conditions in the Ganges basin. 
-The results show significant GRACE-derived TWS variations in response to the monsoon and climatic periods. The hybrid deep learning model consisting of attention-based LSTM successfully imputed the GRACE missing months as well as predicted TWS variations up to 12 months. 
-Moreover, resampled daily TWS data exhibited strong relationship to ITSG daily data in the Ganges basin with a high Pearson’s correlation coefficient of 0.9. The presented integration of artificial intelligence with remote sensing methodologies provides key implications for managing water resources in the river basin for the next few months. 
-It also provides more relevant and timely information for operational decision-making, especially in areas with climate changing scenarios such as the Ganges basin.
+Terrestrial water storage anomalies (TWSA) are a key indicator of hydrological variability in a basin and are widely used to assess groundwater sustainability and climate-driven changes in the water cycle. GRACE and GRACE-FO satellite gravimetry are an invaluable source of observations of TWSA, but due to their low spatial resolution and monthly time resolution they cannot be directly used to carry out high-resolution hydrological analysis and water resource management, especially in monsoon-controlled basins. This study fills this gap in the temporal downscaling and prediction of TWSA down to a daily resolution and physical interpretability of the Ganges River Basin. We develop an explainable artificial intelligence (XAI) model that combines GRACE-derived TWSA with daily hydroclimatic predictors, including precipitation, evapotranspiration (ET), soil moisture storage (SMS), surface runoff, and groundwater storage anomalies, evaluated with random, temporal, and (synthetic) spatial holdout strategies and interpreted with SHapley Additive exPlanations (SHAP). The ensemble tree-based models (Random Forest and XGBoost) perform best under the random and temporal validation schemes and are statistically indistinguishable from each other, while outperforming the recurrent-network models. Because GRACE observes TWSA only monthly, daily-scale skill is assessed indirectly through a temporal closure test, in which the predicted daily TWSA is re-aggregated to monthly and compared against the original monthly GRACE; this confirms strong temporal self-consistency. SHAP analysis shows that antecedent SMS is the primary predictor of TWSA (about 80% of the total explanatory power), followed by lagged ET (about 10-15%), with relatively minor direct effects of precipitation, providing a mechanistic, storage-memory-based explanation of the reconstructed seasonal cycles. The framework enhances GRACE-based hydrological monitoring by providing interpretable TWSA prediction that can support groundwater assessment and climate-resilient water-resource management in data-sparse regions.
 
 <img src="Data/Readme_Figs/Graphical_Abstract.png" width="600"/>
 
@@ -28,7 +20,6 @@ grace-grb/
 │   ├── Ganga Basin Shapefile/          # Basin boundary shapefiles
 │   ├── Outputs/                        # Processed data outputs
 │   └── Readme_Figs/                    # Figures for documentation
-|   └── archive/                        # Original standalone scripts that are not used
 ├── Results/                            # Analysis results and figures
 │   └── figures/                        # Generated plots and maps
 │       ├── temporal_holdout/           # Temporal analysis outputs
@@ -48,6 +39,7 @@ grace-grb/
 │   ├── stats_utils.py                  # Bootstrap CIs, significance tests, leakage-aware CV
 │   ├── temporal_closure_validation.py  # Daily→monthly temporal closure test
 │   ├── analyze_results.py              # Post-hoc CIs, model-comparison significance, leakage diagnostic
+│   ├── tune_hyperparameters.py         # Optuna hyperparameter tuning (walk-forward CV)
 │   ├── plot_style.py                   # Central figure styling (600 DPI, clean labels)
 ```
 
@@ -76,7 +68,7 @@ Unzip all zipped files.  Several of the input datasets in this repository are zi
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Data/ | ~150 MB | Input data (GRACE TWS, GLDAS variables, shapefiles) |
+| Data/ | ~150 MB | Input data (GRACE TWS, ERA5-Land and GLDAS variables, shapefiles) |
 | Results/ | ~150 MB | Generated outputs (figures, predictions, maps) |
 | main/ | <1 MB | Source code |
 | **Total** | **~500 MB** | Full repository with all outputs |
@@ -88,7 +80,7 @@ Open Linux/Mac terminal or Windows PowerShell and run the following:
 ```
 conda create -y -n grace-grb python=3.12
 conda activate grace-grb
-conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap
+conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap optuna
 ```
 
 ### 4. Google Earth Engine Authentication
@@ -137,4 +129,7 @@ Results are saved to `Results/figures/` including:
 - Performance plots (actual vs predicted, residuals)
 - SHAP analysis plots (feature importance, dependence)
 - Model comparison summaries
-- Monthly/seasonal TWS maps with statistics
+- Monthly/seasonal TWS maps with statistics (basin-scale)
+- Bootstrap confidence intervals and Diebold–Mariano significance tables for every metric
+- Leakage diagnostic (shuffled vs blocked vs purged + embargo cross-validation)
+- Temporal closure test (daily predictions re-aggregated to monthly vs original monthly GRACE)

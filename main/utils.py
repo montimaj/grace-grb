@@ -8,10 +8,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.patches import Patch
 from typing import Tuple, List, Dict, Optional, Union, Any
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from dataclasses import dataclass
-from plot_style import pretty_model, clean_feature, clean_features, R2
+from plot_style import (
+    pretty_model, clean_feature, clean_features, R2, R2_BOLD,
+    SCI_COLORS, SCI_BLUE, SCI_ORANGE, SCI_AQUA, BAR, BAR_2,
+)
 
 # Optional SHAP import
 try:
@@ -392,14 +396,16 @@ def plot_model_comparison(
     axes = axes.flatten()
     
     metrics = ['MAE', 'RMSE', 'R2', 'NSE', 'PBIAS']
-    colors = ['#2ecc71', '#3498db', '#9b59b6', '#e74c3c', '#f39c12']
+    # Each panel is a separate metric, so the per-metric hue carries no
+    # information: a single consistent colour (seaborn blue) is used for all bars.
+    colors = [BAR] * len(metrics)
     
     disp_names = [pretty_model(m) for m in model_names]
     for i, (metric, color) in enumerate(zip(metrics, colors)):
         ax = axes[i]
         values = df[metric].values
         bars = ax.bar(disp_names, values, color=color, alpha=0.8)
-        ax.set_title(R2 if metric == 'R2' else metric, fontsize=12, fontweight='bold')
+        ax.set_title(R2_BOLD if metric == 'R2' else metric, fontsize=12, fontweight='bold')
         ax.set_xticklabels(disp_names, rotation=45, ha='right')
         ax.grid(True, alpha=0.3, axis='y')
         
@@ -496,16 +502,15 @@ def plot_train_test_comparison(
         train_vals = train_df[metric].values
         test_vals = test_df[metric].values
         
-        bars1 = ax.bar(x - width/2, train_vals, width, label='Train', color='#3498db', alpha=0.8)
-        bars2 = ax.bar(x + width/2, test_vals, width, label='Test', color='#e74c3c', alpha=0.8)
-        
+        bars1 = ax.bar(x - width/2, train_vals, width, label='Train', color=BAR_2[0], alpha=0.95)
+        bars2 = ax.bar(x + width/2, test_vals, width, label='Test', color=BAR_2[1], alpha=0.95)
+
         ax.set_ylabel(label, fontsize=11)
         ax.set_title(f'{label} - Train vs Test', fontsize=12, fontweight='bold')
         ax.set_xticks(x)
         ax.set_xticklabels([pretty_model(m) for m in model_names], rotation=45, ha='right', fontsize=9)
-        ax.legend(loc='best')
         ax.grid(True, alpha=0.3, axis='y')
-        
+
         # Add value labels
         for bar in bars1:
             ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
@@ -513,12 +518,21 @@ def plot_train_test_comparison(
         for bar in bars2:
             ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
                    f'{bar.get_height():.3f}', ha='center', va='bottom', fontsize=7)
-        
-        # Highlight overfitting (shade between bars where gap is significant)
+
+        # Highlight overfitting (shade the column where the train-test gap is large)
+        shaded = False
         for i, model in enumerate(model_names):
             gap = overfitting_analysis[model][f'{metric}_gap']
             if (higher_better and gap > 0.05) or (not higher_better and gap > 0.5):
                 ax.axvspan(i - 0.5, i + 0.5, alpha=0.1, color='red')
+                shaded = True
+
+        # Legend: Train/Test plus (where drawn) an explanation of the red shading.
+        handles, labels_ = ax.get_legend_handles_labels()
+        if shaded:
+            handles.append(Patch(facecolor='red', alpha=0.1,
+                                 label='Overfitting flag (large train–test gap)'))
+        ax.legend(handles=handles, loc='best', fontsize=8)
     
     plt.suptitle('Training vs Test Performance Comparison', fontsize=14, fontweight='bold')
     plt.tight_layout()
@@ -533,7 +547,7 @@ def plot_train_test_comparison(
     # R² gap (how much better is train vs test)
     ax1 = axes[0]
     r2_gaps = [overfitting_analysis[m]['R2_gap'] for m in model_names]
-    colors = ['#e74c3c' if g > 0.1 else '#f39c12' if g > 0.05 else '#2ecc71' for g in r2_gaps]
+    colors = BAR  # single-colour bars; the dashed threshold lines convey severity
     bars = ax1.bar([pretty_model(m) for m in model_names], r2_gaps, color=colors, alpha=0.8, edgecolor='black')
     ax1.axhline(y=0, color='black', linestyle='-', linewidth=1)
     ax1.axhline(y=0.05, color='orange', linestyle='--', linewidth=1, label='Moderate overfitting (0.05)')
@@ -553,7 +567,7 @@ def plot_train_test_comparison(
     # RMSE gap
     ax2 = axes[1]
     rmse_gaps = [overfitting_analysis[m]['RMSE_gap'] for m in model_names]
-    colors = ['#e74c3c' if g > 2 else '#f39c12' if g > 1 else '#2ecc71' for g in rmse_gaps]
+    colors = BAR  # single-colour bars; the dashed threshold lines convey severity
     bars = ax2.bar([pretty_model(m) for m in model_names], rmse_gaps, color=colors, alpha=0.8, edgecolor='black')
     ax2.axhline(y=0, color='black', linestyle='-', linewidth=1)
     ax2.axhline(y=1, color='orange', linestyle='--', linewidth=1, label='Moderate overfitting (1 mm)')
@@ -596,9 +610,9 @@ def plot_train_test_comparison(
     
     for i, model in enumerate(model_names):
         if model in neural_models:
-            marker, color = 'o', '#3498db'
+            marker, color = 'o', BAR_2[1]
         else:
-            marker, color = 's', '#2ecc71'
+            marker, color = 's', BAR_2[0]
         ax.scatter(train_r2[i], test_r2[i], s=150, marker=marker, c=color, 
                   edgecolors='black', linewidth=1.5, zorder=5)
         ax.annotate(pretty_model(model), (train_r2[i], test_r2[i]), textcoords="offset points",

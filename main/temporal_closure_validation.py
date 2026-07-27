@@ -43,7 +43,7 @@ from scipy import stats
 
 from utils import calculate_metrics, EvaluationMetrics
 from stats_utils import block_bootstrap_metric_cis, format_ci, load_prediction_csv
-from plot_style import DPI, R2, pretty_model
+from plot_style import DPI, R2, pretty_model, SB_BLUE, SB_ORANGE, BAR
 
 MONTH_MAP = {m: i + 1 for i, m in enumerate([
     "January", "February", "March", "April", "May", "June",
@@ -185,9 +185,9 @@ def plot_closure(
     # 1. Time series
     ax1 = fig.add_subplot(1, 3, 1)
     ax1.plot(merged["Month_Start"], merged["GRACE_monthly"], "o-", ms=3,
-             label="Original monthly GRACE", color="#1f77b4", alpha=0.85)
+             label="Original monthly GRACE", color=SB_BLUE, alpha=0.9)
     ax1.plot(merged["Month_Start"], merged["Predicted_monthly"], "s--", ms=3,
-             label="Daily prediction re-aggregated", color="#d62728", alpha=0.85)
+             label="Daily prediction re-aggregated", color=SB_ORANGE, alpha=0.9)
     ax1.set_xlabel("Date")
     ax1.set_ylabel("TWSA (mm)")
     ax1.set_title(f"Temporal closure: monthly re-aggregation\n[{disp}]")
@@ -198,8 +198,8 @@ def plot_closure(
     ax2 = fig.add_subplot(1, 3, 2)
     lo = min(merged["GRACE_monthly"].min(), merged["Predicted_monthly"].min())
     hi = max(merged["GRACE_monthly"].max(), merged["Predicted_monthly"].max())
-    ax2.scatter(merged["GRACE_monthly"], merged["Predicted_monthly"], s=14, alpha=0.6)
-    ax2.plot([lo, hi], [lo, hi], "r--", label="1:1")
+    ax2.scatter(merged["GRACE_monthly"], merged["Predicted_monthly"], s=14, alpha=0.6, color=SB_BLUE)
+    ax2.plot([lo, hi], [lo, hi], "--", color="#555555", label="1:1")
     ax2.set_xlabel("Original monthly GRACE (mm)")
     ax2.set_ylabel("Re-aggregated daily prediction (mm)")
     ax2.set_title(
@@ -240,8 +240,8 @@ def plot_closure_metric_summary(
     r2 = summary["R2"].values
     r2_lo = summary["R2_lower"].values
     r2_hi = summary["R2_upper"].values
-    axes[0].bar(x, r2, color="#2ca02c", alpha=0.8,
-                yerr=[r2 - r2_lo, r2_hi - r2], capsize=4)
+    axes[0].bar(x, r2, color=BAR, alpha=0.95,
+                yerr=[r2 - r2_lo, r2_hi - r2], capsize=4, ecolor="#0b0b0b")
     axes[0].set_xticks(x)
     axes[0].set_xticklabels(labels, rotation=45, ha="right")
     axes[0].set_ylabel(f"Closure {R2}")
@@ -251,8 +251,8 @@ def plot_closure_metric_summary(
     rmse = summary["RMSE"].values
     rmse_lo = summary["RMSE_lower"].values
     rmse_hi = summary["RMSE_upper"].values
-    axes[1].bar(x, rmse, color="#1f77b4", alpha=0.8,
-                yerr=[rmse - rmse_lo, rmse_hi - rmse], capsize=4)
+    axes[1].bar(x, rmse, color=BAR, alpha=0.95,
+                yerr=[rmse - rmse_lo, rmse_hi - rmse], capsize=4, ecolor="#0b0b0b")
     axes[1].set_xticks(x)
     axes[1].set_xticklabels(labels, rotation=45, ha="right")
     axes[1].set_ylabel("Closure RMSE (mm)")

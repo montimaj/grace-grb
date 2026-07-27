@@ -436,6 +436,41 @@ def rank_models_with_significance(
     return pd.DataFrame(rows)
 
 
+def pairwise_dm_comparison_table(
+    y_true: np.ndarray,
+    predictions: Dict[str, np.ndarray],
+    loss: str = "squared",
+    alpha: float = 0.05,
+) -> pd.DataFrame:
+    """
+    Full pairwise Diebold-Mariano comparison table for a set of models.
+
+    For every unordered pair the model with the lower RMSE is taken as the
+    reference, and the table reports the RMSE difference (reference - other,
+    always <= 0) and the DM p-value / significance. This is the tidy,
+    reproducible source for "model A is (not) significantly better than B"
+    statements, e.g. showing both ensembles against the rest.
+
+    Returns rows sorted so the strongest reference (lowest RMSE) comes first.
+    """
+    names = list(predictions.keys())
+    rmse = {n: calculate_metrics(y_true, predictions[n]).rmse for n in names}
+    order = sorted(names, key=lambda n: rmse[n])
+    rows = []
+    for i, a in enumerate(order):
+        for b in order[i + 1:]:
+            # a has the lower (or equal) RMSE -> reference.
+            dm = diebold_mariano(y_true, predictions[a], predictions[b], loss=loss)
+            rows.append({
+                "Reference": a, "Other": b,
+                "RMSE_reference": rmse[a], "RMSE_other": rmse[b],
+                "dRMSE": rmse[a] - rmse[b],
+                "dm_stat": dm["dm_stat"], "p_value": dm["p_value"],
+                "significant": bool(np.isfinite(dm["p_value"]) and dm["p_value"] < alpha),
+            })
+    return pd.DataFrame(rows)
+
+
 # =============================================================================
 # 3. Leakage-aware cross-validation
 # =============================================================================
@@ -720,6 +755,9 @@ def emit_holdout_statistics(
         ranked = rank_models_with_significance(y_test, predictions)
         ranked.to_csv(
             _os.path.join(output_dir, f"{pfx}model_ranking_significance.csv"), index=False)
+        comparison = pairwise_dm_comparison_table(y_test, predictions)
+        comparison.to_csv(
+            _os.path.join(output_dir, f"{pfx}dm_comparison_table.csv"), index=False)
 
 
 if __name__ == "__main__":

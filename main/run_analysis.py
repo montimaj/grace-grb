@@ -65,6 +65,7 @@ def run_analysis(
             tws_file=tws_file,
             output_dir=out_dir,
             models_to_run=models,
+            tuned_params=kwargs.get('tuned_params'),
             seed=seed,
             test_size=kwargs.get('test_size', 0.2)
         )
@@ -82,6 +83,7 @@ def run_analysis(
             tws_file=tws_file,
             output_dir=out_dir,
             models_to_run=models,
+            tuned_params=kwargs.get('tuned_params'),
             seed=seed,
             test_size=kwargs.get('test_size', 0.2),
             run_cv=kwargs.get('run_cv', True)
@@ -115,6 +117,7 @@ def run_analysis(
             data_file=spatial_data_file,
             output_dir=out_dir,
             models_to_run=models,
+            tuned_params=kwargs.get('tuned_params'),
             seed=seed,
             n_spatial_groups=kwargs.get('n_spatial_groups', 5),
             run_cv=kwargs.get('run_cv', True)
@@ -136,7 +139,7 @@ def compare_holdout_methods(results: dict, output_dir: str = "../Results/figures
     """
     import pandas as pd
     import matplotlib.pyplot as plt
-    from plot_style import pretty_model, R2
+    from plot_style import pretty_model, R2, BAR_3
 
     os.makedirs(output_dir, exist_ok=True)
     
@@ -172,7 +175,7 @@ def compare_holdout_methods(results: dict, output_dir: str = "../Results/figures
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     axes = axes.flatten()
     
-    colors = plt.cm.Set2(range(len(holdout_types)))
+    colors = [BAR_3[i % len(BAR_3)] for i in range(len(holdout_types))]
     
     for idx, metric in enumerate(metrics):
         ax = axes[idx]
@@ -280,6 +283,14 @@ def main():
         action='store_true',
         help='Skip cross-validation'
     )
+
+    parser.add_argument(
+        '--tuned-params',
+        type=str,
+        default=None,
+        help='Path to Optuna best-params JSON (from tune_hyperparameters.py); '
+             'when given, models use the tuned hyperparameters'
+    )
     
     parser.add_argument(
         '--compare',
@@ -298,6 +309,14 @@ def main():
         print(f"Error: TWS file not found: {args.tws_file}")
         sys.exit(1)
     
+    # Load tuned hyperparameters if requested
+    tuned = None
+    if args.tuned_params:
+        from tune_hyperparameters import load_tuned_params
+        tuned = load_tuned_params(args.tuned_params)
+        print(f"Loaded tuned hyperparameters from {args.tuned_params} "
+              f"for models: {sorted(k for k in tuned if '+' in k or k[0].isupper())}")
+
     # Run analysis
     results = run_analysis(
         analysis_type=args.analysis,
@@ -307,7 +326,8 @@ def main():
         predictor_file=args.predictor_file,
         tws_file=args.tws_file,
         test_size=args.test_size,
-        run_cv=not args.no_cv
+        run_cv=not args.no_cv,
+        tuned_params=tuned
     )
     
     # Generate comparison if requested
