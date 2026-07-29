@@ -17,9 +17,9 @@ interpolated, gap-carrying) monthly GRACE observations therefore checks whether
 the downscaling preserves the monthly mass that GRACE actually measured.
 
 Key design choices for rigour:
-- The comparison is restricted to months GRACE actually observed (`TWS_JPL.xlsx`
-  lists only observed months), so we never score the model against interpolated
-  gap-fill values.
+- The comparison is restricted to months GRACE actually observed (the target
+  series lists only observed months), so we never score the model against
+  interpolated gap-fill values.
 - Closure metrics carry moving-block bootstrap confidence intervals
   (see `stats_utils.py`), so the closure quality is reported with uncertainty.
 
@@ -37,17 +37,14 @@ import glob
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from scipy import stats
 
-from utils import calculate_metrics, EvaluationMetrics
+from utils import calculate_metrics, EvaluationMetrics, read_grace_monthly
 from stats_utils import block_bootstrap_metric_cis, format_ci, load_prediction_csv
 from plot_style import DPI, R2, pretty_model, SB_BLUE, SB_ORANGE, BAR
 
-MONTH_MAP = {m: i + 1 for i, m in enumerate([
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"])}
 
 
 # =============================================================================
@@ -55,24 +52,18 @@ MONTH_MAP = {m: i + 1 for i, m in enumerate([
 # =============================================================================
 
 def load_observed_monthly_grace(
-    tws_file: str = "../Data/TWS_JPL.xlsx",
+    tws_file: str = "../Data/TWS_GRACE_GEE.csv",
 ) -> pd.DataFrame:
     """
-    Load the ORIGINAL observed monthly GRACE TWSA (before interpolation).
+    The ORIGINAL observed monthly GRACE TWSA (before interpolation), in mm.
 
-    `TWS_JPL.xlsx` contains only months GRACE actually observed (data gaps are
-    simply absent), which is exactly the reference we want for closure.
-
-    Returns
-    -------
-    pd.DataFrame with columns ['Date', 'Month_Start', 'GRACE_monthly'].
+    Delegates to `utils.read_grace_monthly`, the single GRACE reader. This
+    module previously carried its own copy of the month map and unit handling,
+    which is exactly how it kept the malformed-month bug after utils was fixed,
+    and would then have compared millimetre predictions with centimetre
+    observations.
     """
-    tws = pd.read_excel(tws_file)
-    tws = tws.copy()
-    tws["Month_Num"] = tws["Month"].map(MONTH_MAP)
-    tws["Date"] = pd.to_datetime(dict(year=tws["Year"], month=tws["Month_Num"], day=1))
-    tws = tws.sort_values("Date").drop_duplicates(subset="Date")
-    out = tws[["Date", "TWS"]].rename(columns={"TWS": "GRACE_monthly"})
+    out = read_grace_monthly(tws_file).rename(columns={"TWS": "GRACE_monthly"})
     out["Month_Start"] = out["Date"].values.astype("datetime64[M]")
     return out.reset_index(drop=True)
 
@@ -274,7 +265,7 @@ def plot_closure_metric_summary(
 
 def run_temporal_closure_validation(
     predictions_dir: str = "../Results/figures/temporal_holdout",
-    tws_file: str = "../Data/TWS_JPL.xlsx",
+    tws_file: str = "../Data/TWS_GRACE_GEE.csv",
     output_dir: Optional[str] = None,
     pattern: str = "*_full_predictions_*.csv",
     use_split: Optional[str] = None,
@@ -367,7 +358,7 @@ def main():
         description="Temporal closure validation of daily TWSA reconstructions."
     )
     parser.add_argument("--predictions-dir", default="../Results/figures/temporal_holdout")
-    parser.add_argument("--tws-file", default="../Data/TWS_JPL.xlsx")
+    parser.add_argument("--tws-file", default="../Data/TWS_GRACE_GEE.csv")
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--split", default=None, choices=[None, "Train", "Test"],
                         help="Restrict daily series before aggregation (default: all days).")

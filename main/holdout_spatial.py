@@ -1,4 +1,28 @@
 """
+=============================================================================
+RETIRED - superseded by a genuine spatial holdout on gridded data.
+=============================================================================
+
+This module replicates ONE basin-mean series across fabricated locations with
+added noise. Training and test locations therefore share near-identical copies
+of the same series: the split leaks by construction, and the near-perfect scores
+it produces (Random Forest R2 ~ 0.99) reflect that replication, not spatial
+transferability.
+
+Use instead:
+
+    python downscale_model.py --skip-product
+
+which performs leave-one-mascon-out cross-validation with a one-mascon
+neighbour buffer across the 19 independent GRACE mascons covering the Ganga
+basin, on real 0.1 degree gridded predictors. Measured there, spatial transfer
+skill is R2 = 0.05 on raw TWSA and R2 = 0.64 on the detrended anomaly -- the
+component hydrological predictors can actually explain.
+
+This file is kept only to reproduce figures in the earlier basin-scale
+manuscript. It is no longer reachable from run_analysis.py.
+=============================================================================
+
 Spatial Holdout Analysis for TWS Downscaling
 Performs location-based train-test split for evaluating spatial generalization.
 Note: This requires spatially-distributed data with latitude and longitude columns, which is not available in the current dataset.
@@ -9,22 +33,18 @@ import os
 import time
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple
 from sklearn.model_selection import GroupKFold, LeaveOneGroupOut
 from sklearn.cluster import KMeans
 
 from models import (
-    get_model, get_all_models, set_seed,
-    BiLSTMAttentionWrapper, BiLSTMWrapper, LSTMWrapper,
-    XGBoostWrapper, LightGBMWrapper, RandomForestWrapper
+    get_model, set_seed
 )
 from utils import (
-    load_and_preprocess_data, create_lagged_features, prepare_features_target,
-    calculate_metrics, plot_predictions, plot_training_loss,
+    load_and_preprocess_data, create_lagged_features, calculate_metrics, plot_predictions, plot_training_loss,
     plot_feature_importance, plot_model_comparison, plot_train_test_comparison,
     save_predictions, save_full_predictions, create_summary_report, 
-    EvaluationMetrics, run_shap_analysis
+    run_shap_analysis
 )
 
 
@@ -430,7 +450,7 @@ def run_spatial_holdout_analysis(
     dates_test = split_data['dates_test']
     actual_test_groups = split_data['test_groups']
     
-    print(f"\nSpatial Split:")
+    print("\nSpatial Split:")
     print(f"  Training samples: {len(X_train)} (groups: {split_data['train_groups']})")
     print(f"  Test samples: {len(X_test)} (groups: {actual_test_groups})")
     

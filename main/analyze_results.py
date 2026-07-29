@@ -26,7 +26,6 @@ Usage
 from __future__ import annotations
 
 import os
-import glob
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -37,39 +36,46 @@ from utils import (
     load_and_preprocess_data, create_lagged_features, prepare_features_target,
 )
 from stats_utils import (
-    METRIC_NAMES, block_bootstrap_metric_cis, metric_ci_dataframe,
+    block_bootstrap_metric_cis, metric_ci_dataframe,
     model_comparison_matrix, rank_models_with_significance,
     pairwise_dm_comparison_table,
-    paired_bootstrap_metric_diff, compare_cv_leakage, describe_split,
+    paired_bootstrap_metric_diff, compare_cv_leakage, load_prediction_dir,
 )
 from plot_style import DPI, R2, R2_BOLD, pretty_model, pretty_scheme, BAR, BAR_3
-
-
-def _model_name_from_file(path: str) -> str:
-    base = os.path.basename(path)
-    model = base.split("full_predictions_")[-1].replace(".csv", "")
-    return model.replace("_", "+") if "Attention" in model else model
 
 
 def load_holdout_predictions(
     holdout_dir: str, split: str = "Test", pattern: str = "*_full_predictions_*.csv"
 ) -> Dict[str, pd.DataFrame]:
-    """Load {model: test-split DataFrame} from a holdout directory."""
-    files = sorted(glob.glob(os.path.join(holdout_dir, pattern)))
-    preds = {}
-    for f in files:
-        df = pd.read_csv(f)
-        df["Date"] = pd.to_datetime(df["Date"])
-        if split and "Split" in df.columns:
-            df = df[df["Split"] == split].copy()
-        if not df.empty:
-            preds[_model_name_from_file(f)] = df.sort_values("Date").reset_index(drop=True)
-    return preds
+    """{model: test-split DataFrame} from a holdout directory (see stats_utils)."""
+    return load_prediction_dir(holdout_dir, pattern=pattern, split=split)
 
 
 # =============================================================================
 # 1. Metrics with confidence intervals
 # =============================================================================
+
+def _consistent_truth(preds):
+    """
+    Ground truth shared by every model, with a check that it really is shared.
+
+    These functions previously took Actual_TWSA from whichever prediction CSV
+    sorted first. If two models were run against different data versions the
+    mismatch would pass silently and every comparison would be against the wrong
+    reference.
+    """
+    import numpy as _np
+    ref = None
+    for name, d in preds.items():
+        y = d["Actual_TWSA"].to_numpy()
+        if ref is None:
+            ref, ref_name = y, name
+        elif not _np.allclose(ref, y, equal_nan=True):
+            raise ValueError(
+                f"ground truth disagrees between {ref_name} and {name}; the "
+                f"prediction CSVs come from different runs - regenerate them.")
+    return ref
+
 
 def metrics_with_cis(
     preds: Dict[str, pd.DataFrame], n_boot: int = 2000, seed: int = 20
@@ -208,7 +214,7 @@ def best_vs_rest_rmse_diff(
 
 def run_leakage_diagnostic(
     predictor_file: str = "../Data/All_Data.xlsx",
-    tws_file: str = "../Data/TWS_JPL.xlsx",
+    tws_file: str = "../Data/TWS_GRACE_GEE.csv",
     models: Optional[List[str]] = None,
     predictors: Optional[List[str]] = None,
     lags: int = 7,

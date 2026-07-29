@@ -35,6 +35,9 @@ numpy / scipy / pandas.
 
 from __future__ import annotations
 
+import os
+import glob
+
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, asdict
@@ -43,7 +46,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 from scipy import stats
 
 # Reuse the exact metric definitions used everywhere else in the project.
-from utils import calculate_metrics, EvaluationMetrics
+from utils import calculate_metrics
 
 METRIC_NAMES = ["MAE", "RMSE", "R2", "NSE", "PBIAS"]
 
@@ -292,7 +295,10 @@ def diebold_mariano(
     dm_star = dm * corr
     p_value = 2.0 * stats.t.cdf(-abs(dm_star), df=n - 1)
 
-    favored = "model1" if dbar > 0 else ("model2" if dbar < 0 else "tie")
+    # dbar = mean(loss1 - loss2). Positive means model1 has the LARGER loss, so
+    # model2 is favoured. The mapping was inverted, reversing every reported
+    # "which model wins" verdict while leaving the p-values correct.
+    favored = "model2" if dbar > 0 else ("model1" if dbar < 0 else "tie")
     return {
         "dm_stat": float(dm_star),
         "p_value": float(p_value),
@@ -706,6 +712,55 @@ def load_prediction_csv(path: str, split: Optional[str] = "Test") -> pd.DataFram
     return df.sort_values("Date").reset_index(drop=True)
 
 
+def model_name_from_path(path: str) -> str:
+    """
+    Model name from a `*_full_predictions_<Model>.csv` filename.
+
+    The `_`->`+` substitution is GUARDED on "Attention": applied unconditionally
+    it would also rewrite names like `Random_Forest` into `Random+Forest`. Two
+    call sites previously carried different versions of this, one guarded and
+    one not.
+    """
+    base = os.path.basename(path)
+    model = base.split("full_predictions_")[-1].replace(".csv", "")
+    return model.replace("_", "+") if "Attention" in model else model
+
+
+def load_prediction_dir(
+    directory: str,
+    pattern: str = "*_full_predictions_*.csv",
+    split: Optional[str] = "Test",
+    add_time_parts: bool = False,
+    verbose: bool = False,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Load every prediction CSV in a holdout directory, keyed by model name.
+
+    Single loader for all callers. `analyze_results` and `generate_monthly_maps`
+    each had their own copy, which had already drifted apart in how they derive
+    the model name.
+
+    Parameters
+    ----------
+    split : "Test" to score held-out performance, or None to keep the full
+        train+test reconstruction (what the map figures need).
+    add_time_parts : also derive `Month` and `Year` columns.
+    """
+    out: Dict[str, pd.DataFrame] = {}
+    for path in sorted(glob.glob(os.path.join(directory, pattern))):
+        df = load_prediction_csv(path, split=split)
+        if df.empty:
+            continue
+        if add_time_parts:
+            df["Month"] = df["Date"].dt.month
+            df["Year"] = df["Date"].dt.year
+        name = model_name_from_path(path)
+        out[name] = df
+        if verbose:
+            print(f"Loaded predictions for {name}: {len(df)} samples")
+    return out
+
+
 def emit_holdout_statistics(
     y_test: np.ndarray,
     predictions: Dict[str, np.ndarray],
@@ -728,10 +783,27 @@ def emit_holdout_statistics(
 
     Intended to be called at the end of each `run_*_holdout_analysis` with the
     test actuals and each model's test predictions already in scope.
+
+    Rows are sorted by date first. The moving-block bootstrap and the
+    Diebold-Mariano HAC variance both assume the array IS a time series; on the
+    random holdout the rows arrive shuffled, which destroys the autocorrelation
+    those methods exist to account for and yields intervals several times too
+    narrow.
     """
     import os as _os
     _os.makedirs(output_dir, exist_ok=True)
     pfx = f"{prefix}_" if prefix else ""
+
+    # Restore chronological order before any bootstrap or DM call. The random
+    # holdout hands these arrays over shuffled; a moving-block bootstrap on a
+    # shuffled series resamples independent points, so the blocks carry no
+    # autocorrelation and the intervals come out several times too narrow.
+    if dates_test is not None:
+        _order = np.argsort(pd.to_datetime(pd.Series(np.asarray(dates_test))).values)
+        if not np.array_equal(_order, np.arange(len(_order))):
+            y_test = np.asarray(y_test)[_order]
+            predictions = {k: np.asarray(v)[_order] for k, v in predictions.items()}
+            dates_test = np.asarray(dates_test)[_order]
 
     # Split report.
     if dates_train is not None and dates_test is not None and n_features is not None:

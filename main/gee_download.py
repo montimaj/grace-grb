@@ -16,6 +16,8 @@ from joblib import Parallel, delayed
 from urllib.error import HTTPError
 from http.client import RemoteDisconnected
 
+from gridded_config import ee_initialize, BASIN_SHAPEFILE
+
 
 def get_gee_data(
         year: int,
@@ -48,10 +50,7 @@ def get_gee_data(
         None
     """
 
-    ee.Initialize(
-        project='grace-grb',
-        opt_url='https://earthengine-highvolume.googleapis.com'
-    )
+    ee_initialize()
     for gee_date in daily_date_dict[year]:
         daily_csv = f'{daily_output_dir}Daily_GEE_{gee_date}.csv'
         if os.path.exists(daily_csv):
@@ -77,9 +76,13 @@ def get_gee_data(
             .select(gldas_bands[gldas_version][1]) \
             .mean() \
             .rename('ssm_gldas_mm')
+        # MEAN, not sum: GLDAS V021 NOAH is 3-hourly, so eight images fall in a
+        # day. Summing them and then multiplying by 86400 (below) overstates
+        # daily ET by 8x. The daily mean rate x 86400 is correct for both the
+        # 3-hourly V021 and the daily V022 CLSM.
         et_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
             .select(gldas_bands[gldas_version][2]) \
-            .sum() \
+            .mean() \
             .rename('et_gldas_mm')
         if gldas_version == 'V022':
             tws_gldas = gldas_ic.filterDate(gee_date, gee_date_adv) \
@@ -108,6 +111,32 @@ def get_gee_data(
             .mean() \
             .add(-273.15) \
             .rename('tmin_era5_degC')
+        # ERA5-Land soil water and evapotranspiration. These replace the GLDAS
+        # 2.2 CLSM fields: GLDAS-2.2 ASSIMILATES GRACE, so its soil moisture
+        # carried the assimilation increment and its TWS/GWS bands simply are
+        # GRACE -- using them as predictors meant predicting the target from the
+        # target. ERA5-Land has no GRACE in its production chain.
+        #
+        # Soil water is VOLUMETRIC (m3/m3); multiply by layer thickness in mm.
+        sm1_era5 = era5land_ic.filterDate(gee_date, gee_date_adv) \
+            .select('volumetric_soil_water_layer_1') \
+            .mean() \
+            .multiply(70) \
+            .rename('sm1_era5_mm')
+        rzsm_era5 = era5land_ic.filterDate(gee_date, gee_date_adv) \
+            .select(['volumetric_soil_water_layer_1',
+                     'volumetric_soil_water_layer_2',
+                     'volumetric_soil_water_layer_3']) \
+            .mean() \
+            .multiply(ee.Image.constant([70, 210, 720])) \
+            .reduce(ee.Reducer.sum()) \
+            .rename('rzsm_era5_mm')
+        # Evaporation is reported as a NEGATIVE downward flux in metres.
+        et_era5 = era5land_ic.filterDate(gee_date, gee_date_adv) \
+            .select('total_evaporation_sum') \
+            .mean() \
+            .multiply(-1000) \
+            .rename('et_era5_mm')
         tws_gldas_band = [] if tws_gldas is None else [tws_gldas]
         tws_gldas_band_name = [] if tws_gldas is None else ['tws_gldas_mm']
         data_band_names = tws_gldas_band_name + [
@@ -117,7 +146,10 @@ def get_gee_data(
             'ppt_era5_mm',
             'runoff_era5_mm',
             'tmax_era5_degC',
-            'tmin_era5_degC'
+            'tmin_era5_degC',
+            'sm1_era5_mm',
+            'rzsm_era5_mm',
+            'et_era5_mm'
         ]
         sum_data_band_names = tws_gldas_band_name + [
             'et_gldas_mm',
@@ -131,7 +163,10 @@ def get_gee_data(
             ppt_era5,
             runoff_era5,
             tmax_era5,
-            tmin_era5
+            tmin_era5,
+            sm1_era5,
+            rzsm_era5,
+            et_era5
         ]
         sum_data_bands = tws_gldas_band + [
             et_gldas,
@@ -201,7 +236,7 @@ def get_gee_data(
             lwe_grace = grace_ic.filterDate(month_yr, month_year_adv) \
                 .select('lwe_thickness') \
                 .mean() \
-                .multiply(100) \
+                .multiply(10) \
                 .rename('lwe_thickness_mm')
 
             data_fc_mean = lwe_grace.reduceRegions(
@@ -269,10 +304,7 @@ def gee_data_download(
     try:
         input_gdf = gpd.read_file(input_vector_path)
         print("Shapefile loaded successfully.")
-        ee.Initialize(
-            project='grace-grb',
-            opt_url='https://earthengine-highvolume.googleapis.com'
-        )
+        ee_initialize()
         year_list = range(start_year, end_year + 1)
         gdf = input_gdf.to_crs("EPSG:4326")
         geo_json = gdf.to_json()
@@ -334,11 +366,11 @@ if __name__ == "__main__":
     input_dir = '../Data/'
     out_dir = f'{input_dir}Outputs/'
     os.makedirs(out_dir, exist_ok=True)
-    shapefile_path = f"{input_dir}Ganga Basin Shapefile/Ganga_basin.shp"
+    shapefile_path = BASIN_SHAPEFILE
     gee_data_download(
         input_vector_path=shapefile_path,
-        start_year=2002,
-        end_year=2024,
+        start_year=2000,
+        end_year=2025,
         output_dir=out_dir,
-        gldas_version='V021'  # Change to 'V022' if needed
+        gldas_version='V021'  # V022 CLSM assimilates GRACE - do not use
     )

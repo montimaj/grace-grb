@@ -216,7 +216,7 @@ def load_training_features(predictor_file, tws_file, predictors=None, lags=7, te
 def run_tuning(
     models,
     predictor_file="../Data/All_Data.xlsx",
-    tws_file="../Data/TWS_JPL.xlsx",
+    tws_file="../Data/TWS_GRACE_GEE.csv",
     n_trials=60,
     nn_trials=20,
     n_splits=4,
@@ -345,7 +345,7 @@ def main():
     p.add_argument("--nn-epochs-max", type=int, default=40, help="Max epochs sampled for NNs.")
     p.add_argument("--seed", type=int, default=20)
     p.add_argument("--predictor-file", default="../Data/All_Data.xlsx")
-    p.add_argument("--tws-file", default="../Data/TWS_JPL.xlsx")
+    p.add_argument("--tws-file", default="../Data/TWS_GRACE_GEE.csv")
     p.add_argument("--out", default=DEFAULT_PARAM_PATH)
     p.add_argument("--summarize", action="store_true",
                    help="Only build the summary table/figure from an existing JSON (no tuning).")

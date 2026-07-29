@@ -197,3 +197,22 @@ spatial_data_synthetic.csv
 .DS_Store
 Results.zip
 paper/
+# Gridded downscaling pipeline: raw GeoTIFF stacks (~7 GB) and assembled cubes.
+# Regenerate with `python main/gee_gridded_download.py && python main/build_cube.py`.
+Data/Gridded/
+*.tif
+*.nc
+*.zarr/
+
+# ...but the downscaled products themselves are results worth versioning.
+!Results/downscaling/
+!Results/downscaling/**
+
+# Claude Code per-user settings (project settings.json IS shared)
+.claude/settings.local.json
+
+# Working scratch TODO (not documentation - the READMEs are)
+TODO.md
+
+# Claude Code local config (shared settings intentionally not tracked)
+.claude/

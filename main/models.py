@@ -1,4 +1,13 @@
 """
+Model wrappers for the BASIN-SCALE pipeline.
+
+The recurrent models (LSTM, BiLSTM, BiLSTM+Attention) exist for the basin-scale
+model comparison only. The gridded 0.1 degree pipeline uses tree ensembles
+exclusively: its training set is ~19 independent mascons, far too few spatial
+degrees of freedom to fit a recurrent network without memorising them, and its
+target is monthly rather than a daily sequence.
+
+
 ML Model Wrapper Classes for TWS Downscaling
 Supports: BiLSTM+Attention, BiLSTM, LSTM, XGBoost, LightGBM, RandomForest
 """
@@ -151,11 +160,22 @@ class PyTorchModelWrapper(BaseModelWrapper):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     def _prepare_sequences(self, X: np.ndarray) -> np.ndarray:
-        """Reshape data into sequences for LSTM models."""
-        # X should already have shape (n_samples, n_features * seq_length)
-        # Reshape to (n_samples, seq_length, n_features)
+        """
+        Reshape a flat lagged design matrix into (n_samples, seq_length, n_features).
+
+        `utils.prepare_features_target` emits columns FEATURE-MAJOR:
+
+            SMS_lag1..SMS_lag7, ET_lag1..ET_lag7, rainfall_lag1..., ...
+
+        so the flat row is [f0t0..f0t6, f1t0..f1t6, ...]. A direct
+        `reshape(n, seq_length, n_features)` reads that as TIME-major and puts
+        predictor f at lag t where the model expects lag t of predictor f --
+        scrambling the time axis the recurrent layers exist to exploit. Reshape
+        feature-major first, then transpose, so [i, t, f] really is predictor f
+        at lag t+1.
+        """
         n_samples = X.shape[0]
-        return X.reshape(n_samples, self.seq_length, self.n_features)
+        return X.reshape(n_samples, self.n_features, self.seq_length).transpose(0, 2, 1)
     
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = True, **kwargs) -> 'PyTorchModelWrapper':
         """Fit the PyTorch model."""

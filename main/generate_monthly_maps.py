@@ -5,18 +5,17 @@ for each model using temporal holdout results.
 """
 
 import os
-import glob
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
-from plot_style import pretty_model, R2
+from plot_style import pretty_model
 
 
 # Season definitions
@@ -40,40 +39,21 @@ BASIN_SCALE_NOTE = ("Basin-averaged (spatially integrated) value shown as a unif
 
 def load_predictions(predictions_dir: str) -> Dict[str, pd.DataFrame]:
     """
-    Load all prediction CSV files from the temporal holdout directory.
-    
-    Parameters
-    ----------
-    predictions_dir : str
-        Path to directory containing prediction CSVs
-    
-    Returns
-    -------
-    Dict[str, pd.DataFrame]
-        Dictionary mapping model names to their prediction DataFrames
+    All temporal-holdout prediction CSVs, keyed by model name.
+
+    Keeps BOTH splits (`split=None`): these figures show the full reconstruction,
+    not held-out performance. Delegates to `stats_utils.load_prediction_dir`, the
+    single loader.
     """
-    predictions = {}
-    
-    # Find all prediction CSV files
-    pattern = os.path.join(predictions_dir, "temporal_full_predictions_*.csv")
-    files = glob.glob(pattern)
-    
-    for file in files:
-        # Extract model name from filename
-        filename = os.path.basename(file)
-        model_name = filename.replace("temporal_full_predictions_", "").replace(".csv", "")
-        model_name = model_name.replace("_", "+")  # Handle BiLSTM+Attention
-        
-        # Load predictions
-        df = pd.read_csv(file)
-        df['Date'] = pd.to_datetime(df['Date'])
-        df['Month'] = df['Date'].dt.month
-        df['Year'] = df['Date'].dt.year
-        
-        predictions[model_name] = df
-        print(f"Loaded predictions for {model_name}: {len(df)} samples")
-    
-    return predictions
+    from stats_utils import load_prediction_dir
+
+    return load_prediction_dir(
+        predictions_dir,
+        pattern="temporal_full_predictions_*.csv",
+        split=None,
+        add_time_parts=True,
+        verbose=True,
+    )
 
 
 def load_basin_shapefile(shapefile_path: str) -> gpd.GeoDataFrame:
@@ -90,7 +70,11 @@ def load_basin_shapefile(shapefile_path: str) -> gpd.GeoDataFrame:
     gpd.GeoDataFrame
         GeoDataFrame containing basin geometry
     """
-    gdf = gpd.read_file(shapefile_path)
+    # Delegates to the single basin reader, which guarantees EPSG:4326. This
+    # function previously called gpd.read_file without .to_crs and worked only
+    # because the shapefile happens to already be in that CRS.
+    from gridded_config import load_basin
+    gdf = load_basin()
     print(f"Loaded shapefile with {len(gdf)} features")
     print(f"CRS: {gdf.crs}")
     return gdf
@@ -455,7 +439,7 @@ def plot_model_comparison_maps(
                    dpi=600, bbox_inches='tight')
         plt.close()
     
-    print(f"Saved model comparison maps for all months")
+    print("Saved model comparison maps for all months")
 
 
 def plot_seasonal_comparison_maps(
@@ -544,7 +528,7 @@ def plot_seasonal_comparison_maps(
                    dpi=600, bbox_inches='tight')
         plt.close()
     
-    print(f"Saved model comparison maps for all seasons")
+    print("Saved model comparison maps for all seasons")
 
 
 def plot_annual_cycle(
@@ -991,11 +975,12 @@ def save_summary_tables(
     print(f"Saved summary tables to {output_dir}")
 
 
-def main():
+def main(predictions_dir=None, shapefile=None, output_dir=None):
     """Main function to generate monthly and seasonal maps."""
     # Configuration
     predictions_dir = "../Results/figures/temporal_holdout"
-    shapefile_path = "../Data/Ganga Basin Shapefile/Ganga_basin.shp"
+    from gridded_config import BASIN_SHAPEFILE
+    shapefile_path = BASIN_SHAPEFILE
     output_dir = "../Results/figures/monthly_seasonal_maps"
     
     # Check paths
@@ -1081,4 +1066,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    from gridded_config import BASIN_SHAPEFILE
+    _ap = argparse.ArgumentParser(description=__doc__)
+    _ap.add_argument('--predictions-dir', default='../Results/figures/temporal_holdout')
+    _ap.add_argument('--shapefile', default=BASIN_SHAPEFILE)
+    _ap.add_argument('--output-dir', default='../Results/figures/monthly_seasonal_maps')
+    _a = _ap.parse_args()
+    main(_a.predictions_dir, _a.shapefile, _a.output_dir)

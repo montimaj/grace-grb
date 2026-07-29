@@ -13,7 +13,8 @@ Models available:
 Holdout Types:
 - Random: Random train-test split
 - Temporal: Time-based split (chronological)
-- Spatial: Location-based split (for spatially distributed data)
+- Spatial: RETIRED (was synthetic and leaked); use downscale_model.py
+  for the real leave-one-mascon-out holdout on gridded data
 """
 
 import argparse
@@ -34,7 +35,8 @@ def run_analysis(
     Parameters
     ----------
     analysis_type : str
-        Type of analysis: 'random', 'temporal', 'spatial', or 'all'
+        Type of analysis: 'random', 'temporal', or 'all'
+        ('spatial' is retired - see downscale_model.py)
     models : list
         List of model names to run
     output_dir : str
@@ -48,7 +50,7 @@ def run_analysis(
         models = ['bilstm_attention', 'bilstm', 'lstm', 'xgboost', 'lightgbm', 'randomforest']
     
     predictor_file = kwargs.get('predictor_file', 'All_Data.xlsx')
-    tws_file = kwargs.get('tws_file', 'TWS_JPL.xlsx')
+    tws_file = kwargs.get('tws_file', '../Data/TWS_GRACE_GEE.csv')
     
     results = {}
     
@@ -89,40 +91,23 @@ def run_analysis(
             run_cv=kwargs.get('run_cv', True)
         )
     
-    if analysis_type in ['spatial', 'all']:
-        print("\n" + "="*60)
-        print("RUNNING SPATIAL HOLDOUT ANALYSIS")
-        print("="*60)
-        
-        from holdout_spatial import (
-            run_spatial_holdout_analysis, 
-            create_synthetic_spatial_data
+    if analysis_type == 'spatial':
+        raise SystemExit(
+            "The synthetic spatial holdout has been RETIRED.\n\n"
+            "It replicated the single basin-mean series across fabricated "
+            "locations with added noise, so train and test shared near-identical\n"
+            "copies and it leaked by construction (Random Forest R2 ~ 0.99). It "
+            "measured noise sensitivity, not spatial transferability.\n\n"
+            "It is superseded by a genuine spatial holdout on real gridded data:\n"
+            "    python downscale_model.py --skip-product\n"
+            "which runs leave-one-mascon-out cross-validation with a one-mascon "
+            "neighbour buffer over the 19 independent GRACE mascons covering the\n"
+            "basin. On the same quantity that test gives R2 = 0.05 (raw) and "
+            "R2 = 0.64 on the component the predictors can actually explain.\n\n"
+            "To reproduce the superseded figures for the earlier manuscript, call "
+            "holdout_spatial.run_spatial_holdout_analysis() directly."
         )
-        
-        spatial_data_file = kwargs.get('spatial_data_file', '../Data/spatial_data_synthetic.csv')
-        
-        # Create synthetic spatial data if needed
-        if not os.path.exists(spatial_data_file):
-            print("Creating synthetic spatial data for demonstration...")
-            create_synthetic_spatial_data(
-                predictor_file=predictor_file,
-                tws_file=tws_file,
-                output_file=spatial_data_file,
-                n_locations=10,
-                seed=seed
-            )
-        
-        out_dir = output_dir or "../Results/figures/spatial_holdout"
-        results['spatial'] = run_spatial_holdout_analysis(
-            data_file=spatial_data_file,
-            output_dir=out_dir,
-            models_to_run=models,
-            tuned_params=kwargs.get('tuned_params'),
-            seed=seed,
-            n_spatial_groups=kwargs.get('n_spatial_groups', 5),
-            run_cv=kwargs.get('run_cv', True)
-        )
-    
+
     return results
 
 
@@ -232,7 +217,8 @@ def main():
         type=str,
         choices=['random', 'temporal', 'spatial', 'all'],
         default='all',
-        help='Type of holdout analysis to run (default: all)'
+        help="Type of holdout analysis to run (default: all). 'spatial' is retired "
+             "and exits with a pointer to the real leave-one-mascon-out test."
     )
     
     parser.add_argument(
@@ -274,7 +260,7 @@ def main():
     parser.add_argument(
         '--tws-file',
         type=str,
-        default='../Data/TWS_JPL.xlsx',
+        default='../Data/TWS_GRACE_GEE.csv',
         help='Path to TWS data file'
     )
     

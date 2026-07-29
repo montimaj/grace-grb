@@ -1,10 +1,21 @@
-# Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin
+# Spatial Downscaling and Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin
 
 ## Citation
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Spatial Downscaling and Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
+
+> Title revised from "Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin". The original wording described the earlier basin-scale analysis and, applied to this work, would overstate the daily component: the daily field is disaggregated under an exact monthly constraint, not downscaled. See [METHODS.md](METHODS.md) for the distinction.
 
 ## Abstract
-Terrestrial water storage anomalies (TWSA) are a key indicator of hydrological variability in a basin and are widely used to assess groundwater sustainability and climate-driven changes in the water cycle. GRACE and GRACE-FO satellite gravimetry are an invaluable source of observations of TWSA, but due to their low spatial resolution and monthly time resolution they cannot be directly used to carry out high-resolution hydrological analysis and water resource management, especially in monsoon-controlled basins. This study fills this gap in the temporal downscaling and prediction of TWSA down to a daily resolution and physical interpretability of the Ganges River Basin. We develop an explainable artificial intelligence (XAI) model that combines GRACE-derived TWSA with daily hydroclimatic predictors, including precipitation, evapotranspiration (ET), soil moisture storage (SMS), surface runoff, and groundwater storage anomalies, evaluated with random, temporal, and (synthetic) spatial holdout strategies and interpreted with SHapley Additive exPlanations (SHAP). The ensemble tree-based models (Random Forest and XGBoost) perform best under the random and temporal validation schemes and are statistically indistinguishable from each other, while outperforming the recurrent-network models. Because GRACE observes TWSA only monthly, daily-scale skill is assessed indirectly through a temporal closure test, in which the predicted daily TWSA is re-aggregated to monthly and compared against the original monthly GRACE; this confirms strong temporal self-consistency. SHAP analysis shows that antecedent SMS is the primary predictor of TWSA (about 80% of the total explanatory power), followed by lagged ET (about 10-15%), with relatively minor direct effects of precipitation, providing a mechanistic, storage-memory-based explanation of the reconstructed seasonal cycles. The framework enhances GRACE-based hydrological monitoring by providing interpretable TWSA prediction that can support groundwater assessment and climate-resilient water-resource management in data-sparse regions.
+
+> **The abstract below describes the ORIGINAL basin-scale manuscript and is
+> superseded.** Several of its claims no longer hold: the "antecedent SMS ~80% of
+> explanatory power / storage memory" result rested on a GLDAS 2.2 field that
+> **assimilates GRACE**, `GWSA` contains no groundwater (it is de-meaned runoff),
+> and all MAE/RMSE were reported 10x too small (centimetres labelled millimetres).
+> The current work is a per-pixel **0.1 degree daily** product for 2000-2025 with
+> per-pixel uncertainty. See [METHODS.md](METHODS.md).
+
+Terrestrial water storage anomalies (TWSA) are a key indicator of hydrological variability in a basin and are widely used to assess groundwater sustainability and climate-driven changes in the water cycle. GRACE and GRACE-FO satellite gravimetry are an invaluable source of observations of TWSA, but due to their low spatial resolution and monthly time resolution they cannot be directly used to carry out high-resolution hydrological analysis and water resource management, especially in monsoon-controlled basins. This study fills this gap in the temporal downscaling and prediction of TWSA down to a daily resolution and physical interpretability of the Ganges River Basin. We develop an explainable artificial intelligence (XAI) model that combines GRACE-derived TWSA with daily hydroclimatic predictors, including precipitation, evapotranspiration (ET), soil moisture storage (SMS), surface runoff, and groundwater storage anomalies, evaluated with random and temporal holdout strategies and interpreted with SHapley Additive exPlanations (SHAP). The ensemble tree-based models (Random Forest and XGBoost) perform best under the random and temporal validation schemes and are statistically indistinguishable from each other, while outperforming the recurrent-network models. Because GRACE observes TWSA only monthly, daily-scale skill is assessed indirectly through a temporal closure test, in which the predicted daily TWSA is re-aggregated to monthly and compared against the original monthly GRACE; this confirms strong temporal self-consistency. SHAP analysis shows that antecedent SMS is the primary predictor of TWSA (about 80% of the total explanatory power), followed by lagged ET (about 10-15%), with relatively minor direct effects of precipitation, providing a mechanistic, storage-memory-based explanation of the reconstructed seasonal cycles. The framework enhances GRACE-based hydrological monitoring by providing interpretable TWSA prediction that can support groundwater assessment and climate-resilient water-resource management in data-sparse regions.
 
 <img src="Data/Readme_Figs/Graphical_Abstract.png" width="600"/>
 
@@ -12,38 +23,180 @@ Terrestrial water storage anomalies (TWSA) are a key indicator of hydrological v
 
 ```
 grace-grb/
-├── README.md                           # Main readme
-├── LICENSE                             # License file
-├── Data/                               # Input data files
-│   ├── All_Data.xlsx                   # Predictor variables (SMS, ET, rainfall, runoff, GWSA)
-│   ├── TWS_JPL.xlsx                    # GRACE TWS data
-│   ├── Ganga Basin Shapefile/          # Basin boundary shapefiles
-│   ├── Outputs/                        # Processed data outputs
-│   └── Readme_Figs/                    # Figures for documentation
-├── Results/                            # Analysis results and figures
-│   └── figures/                        # Generated plots and maps
-│       ├── temporal_holdout/           # Temporal analysis outputs
-│       ├── random_holdout/             # Random analysis outputs
-│       ├── spatial_holdout/            # Spatial analysis outputs
-│       └── monthly_seasonal_maps/      # Monthly/seasonal TWS maps
-├── main/                               # Main codebase
-│   ├── README.md                       # Detailed methods documentation
-│   ├── models.py                       # ML model wrapper classes (LSTM, BiLSTM, XGBoost, etc.)
-│   ├── utils.py                        # Utility functions (metrics, plotting, SHAP analysis)
-│   ├── holdout_random.py               # Random holdout analysis
-│   ├── holdout_temporal.py             # Temporal holdout analysis
-│   ├── holdout_spatial.py              # Spatial/grouped holdout analysis (synthetic; see limitations)
-│   ├── run_analysis.py                 # Main CLI entry point
-│   ├── generate_monthly_maps.py        # Monthly/seasonal TWS map generation
-│   ├── gee_download.py                 # Google Earth Engine data download
+├── README.md                           # This file
+├── LICENSE
+├── Data/
+│   ├── All_Data.xlsx                   # Daily predictors (SMS, ET, rainfall, runoff, GWSA)
+│   ├── TWS_GRACE_GEE.csv               # GRACE target, generated by export_basin_grace.py
+│   ├── TWS_JPL.xlsx                    # LEGACY target, superseded (see note below)
+│   ├── Ganga Basin Shapefile/          # Basin boundary
+│   ├── Groundwater/                    # CGWB wells (Kuruva et al. 2025) - validation only
+│   ├── Gridded/                        # Generated: native-grid GeoTIFFs + netCDF cubes (~10 GB, gitignored)
+│   │   ├── raw/                        #   one GeoTIFF per (grid, variable, month)
+│   │   ├── cubes/                      #   era5/gldas/grace cubes + grids_aux.nc
+│   │   └── wells/                      #   ingested well metadata and GWS anomalies
+│   ├── Outputs/                        # Processed basin-mean CSVs
+│   └── Readme_Figs/
+├── Results/
+│   ├── downscaling/                    # 0.1 deg products, spatial CV, well validation
+│   └── figures/
+│       ├── temporal_holdout/           # Temporal holdout outputs
+│       ├── random_holdout/             # Random holdout outputs
+│       ├── monthly_seasonal_maps/      # Basin-scale summaries (one value per polygon)
+│       └── gridded_maps/               # Per-pixel 0.1 deg maps
+├── main/
+│   ├── README.md                       # Detailed methods and API reference
+│   ├── run_full_pipeline.sh               # SINGLE ENTRY POINT - regenerates everything
+│   │
+│   │   # --- shared ---
+│   ├── utils.py                        # Data loading, GRACE reader, metrics, SHAP, plotting
+│   ├── models.py                       # ML model wrappers (LSTM, BiLSTM, XGBoost, ...)
 │   ├── stats_utils.py                  # Bootstrap CIs, significance tests, leakage-aware CV
-│   ├── temporal_closure_validation.py  # Daily→monthly temporal closure test
-│   ├── analyze_results.py              # Post-hoc CIs, model-comparison significance, leakage diagnostic
-│   ├── tune_hyperparameters.py         # Optuna hyperparameter tuning (walk-forward CV)
 │   ├── plot_style.py                   # Central figure styling (600 DPI, clean labels)
+│   │
+│   │   # --- basin-scale (temporal downscaling) ---
+│   ├── run_analysis.py                 # CLI entry point for the holdout analyses
+│   ├── holdout_random.py               # Random holdout
+│   ├── holdout_temporal.py             # Temporal (chronological) holdout
+│   ├── holdout_spatial.py              # RETIRED - synthetic, leaked by construction
+│   ├── analyze_results.py              # Post-hoc CIs, model comparison, leakage diagnostic
+│   ├── temporal_closure_validation.py  # Daily -> monthly closure test
+│   ├── tune_hyperparameters.py         # Optuna tuning (walk-forward CV)
+│   ├── generate_monthly_maps.py        # Basin-scale monthly/seasonal summaries
+│   ├── gee_download.py                 # Basin-mean predictor download from GEE
+│   │
+│   │   # --- gridded (spatial downscaling to 0.1 deg) ---
+│   ├── gridded_config.py               # Grids, dataset specs, unit provenance
+│   ├── gee_gridded_download.py         # Native-grid GeoTIFF export from GEE
+│   ├── build_cube.py                   # netCDF cubes, basin mask, mascon partition
+│   ├── export_basin_grace.py           # GRACE target from the gridded cube  <- run first
+│   ├── build_all_data.py               # rebuild All_Data.xlsx from the GEE download
+│   ├── downscale_grid_ops.py           # Exact area-overlap regridding operators
+│   ├── downscale_features.py           # Gridded feature construction
+│   ├── downscale_model.py              # Spatial CV + 0.1 deg product + mass conservation
+│   ├── downscale_uncertainty.py        # Per-pixel uncertainty ensemble
+│   ├── generate_gridded_maps.py        # Maps from the gridded product
+│   ├── wells_ingest.py                 # CGWB well ingest (validation set)
+│   └── validate_wells.py               # Independent validation vs wells
 ```
 
-> **Scope note.** This is a **basin-scale (spatially integrated) temporal** downscaling: all inputs are basin-mean series, so results are not per-pixel and the "maps" are basin-scale summaries. The daily target is a linear interpolation of monthly GRACE (no independent daily observation), so daily consistency is assessed via the **temporal closure test** (`temporal_closure_validation.py`). The spatial holdout runs on **synthetic** replicated data and is a noise-sensitivity demonstration only. See [main/README.md](main/README.md#scope-and-limitations-please-read-before-interpreting-results) for details.
+> **On the two target files.** `TWS_GRACE_GEE.csv` is generated by
+> `export_basin_grace.py` and is the target everything now uses.
+> `TWS_JPL.xlsx` is retained only so earlier results can be reproduced: it has no
+> recorded provenance, contains malformed month names (`'January '` ×20,
+> `'july'` ×1) that silently dropped 8.9% of the GRACE record, stores
+> centimetres while being labelled millimetres, and correlates only r = 0.94
+> with a properly area-weighted basin mean of the product it claims to be.
+> `utils.read_grace_monthly()` reads both and now raises rather than dropping.
+
+> **Scope note.** The original analysis is a **basin-scale (spatially integrated) temporal** downscaling: all inputs are basin-mean series, so those results are not per-pixel and the corresponding "maps" are basin-scale summaries. The daily target is a linear interpolation of monthly GRACE (no independent daily observation), so daily consistency is assessed via the **temporal closure test** (`temporal_closure_validation.py`).
+
+## Gridded (spatial) downscaling
+
+A second pipeline produces a **0.1° (~11 km, ERA5-Land native grid) monthly TWSA product** for the Ganga basin, 2003–2024, with per-pixel uncertainty. It supersedes the basin-scale maps and the synthetic spatial holdout.
+
+```bash
+cd main
+./run_full_pipeline.sh --with-download   # everything, from raw inputs
+```
+
+Or step by step:
+
+```bash
+python gee_gridded_download.py     # native-grid stacks (~5 GB)
+python gee_static_download.py      # static covariates (53 rasters)
+python build_cube.py               # netCDF cubes + mascon partition + static cube
+python export_basin_grace.py       # GRACE target  <- everything depends on this
+python downscale_covariate_gate.py # which covariates earn a place (auto-promotes)
+python downscale_model.py          # spatial CV + 0.1 deg monthly product
+python downscale_uncertainty.py    # per-pixel uncertainty ensemble
+python downscale_daily.py          # DAILY 0.1 deg product
+python generate_gridded_maps.py    # figures
+python validate_wells.py           # independent well comparison
+python export_cogs.py              # COGs + geeup upload script
+```
+
+### The daily product
+
+`Results/downscaling/twsa_0p1deg_daily.nc` — daily, 0.1 deg, 2000-2025.
+
+The monthly field is the anchor; within-month variation is added as a shape that
+is **de-meaned per pixel per month**, so monthly means are untouched and the
+daily field re-aggregates to GRACE exactly. Two independent routes are computed:
+
+| variable | derivation |
+|---|---|
+| `twsa_flux` | running sum of P - ET - Qs - Qsb within the month |
+| `twsa_state` | ERA5-Land soil water layers 1-4 + snow water equivalent |
+| `daily_method_spread` | half their absolute difference - the only available uncertainty on the sub-monthly shape |
+
+A daily ML model is **deliberately not used**: GRACE is monthly, so no daily
+target exists, and such a model could only be trained on an interpolation of the
+monthly product and would learn to reproduce that assumption.
+
+> **Daily variation is inferred, not observed.** GRACE is monthly and the CGWB
+> wells are quarterly, so nothing validates the sub-monthly shape directly.
+
+### Covariates
+
+Nine static/annual covariates (water table depth, AWC, root depth, elevation,
+sub-grid relief, log upstream area, height above drainage, irrigated and rainfed
+cropland) are downloaded to the 0.1 deg grid. Which ones the model uses is
+decided by `downscale_covariate_gate.py` on **held-out** skill and picked up
+automatically via `covariate_survivors.json`; `GRACE_COVARIATES` overrides it.
+
+Categorical land cover is one-hot masked at its native 309 m *before*
+aggregation. Requesting the class field directly at 10 km makes Earth Engine
+average class **codes**, returning values absent from the LCCS legend that
+nonetheless look like ordinary data.
+
+**What GRACE can and cannot constrain here.** JPL RL06 mascons are **3° native**, served on a 0.5° grid: 364 grid cells over the basin carry only **20 distinct values**. A 0.1° product is therefore a ~450× expansion of spatial degrees of freedom. GRACE supplies the mass constraint; ERA5-Land and GLDAS supply all fine-scale texture. Mass conservation forces every mascon's area-weighted aggregate onto the observed value (residual < 1e-9 mm), so **agreement with GRACE at mascon scale is imposed by construction and is not evidence of skill**.
+
+**Real spatial holdout.** Leave-one-mascon-out with a one-mascon neighbour buffer over the 19 in-basin mascons, (qualitative; see note):
+
+> **Note.** The per-component skill figures previously quoted here were produced by an
+> ad-hoc script, not by the pipeline, and mixed two different decompositions (their
+> shares summed to 116%). They have been removed pending a `--component` flag in
+> `downscale_model.py` that computes them reproducibly. The qualitative finding stands
+> and *is* reproducible from `downscale_model.py --skip-product`: the predictors transfer
+> the seasonal cycle across space well and cannot predict the secular trend, because the
+> basin's decline is groundwater abstraction and no reanalysis simulates pumping.
+
+
+The predictors transfer the monsoon cycle across space well and cannot predict the trend, because the basin's secular decline is groundwater abstraction, which no reanalysis simulates. The product therefore takes level and trend from GRACE and uses the model only for seasonal/spatial structure.
+
+> The earlier **synthetic** spatial holdout is **retired**. It replicated one basin-mean series across fabricated locations with noise, leaked by construction, and scored R² ≈ 0.99 for the quantity measured honestly at R² = 0.05. `holdout_spatial.py` is kept only to reproduce the earlier manuscript's figures and is no longer reachable from `run_analysis.py`.
+
+
+### The product is gap-filled
+
+GRACE observes 219 of the 263 months in the record; the rest — most importantly the
+~11-month **GRACE → GRACE-FO transition** — have no observation. The 0.1° product is a
+**single, continuous, gap-filled field**: every month carries a value.
+
+For an unobserved month, mass conservation cannot act, so the value is the extrapolated
+per-mascon level+trend plus the modelled seasonal anomaly — a reconstruction, not an
+observation-constrained estimate. Three things keep that honest:
+
+- **`grace_observed(time)`** — an `int8` flag in the netCDF, `0` for reconstructed months.
+  Mask on it for observation-only use.
+- **`sigma_gap`** — an extra uncertainty term, zero where GRACE observed and growing with
+  depth into a blackout, so the error bar widens where the field is least constrained.
+- **It is measured, not asserted.** `gap_recovery_error()` hides contiguous 11-month blocks
+  of *observed* months, refits without them, and compares the reconstruction against the
+  withheld truth. Results in `Results/downscaling/gap_recovery_rmse_by_depth.csv`.
+
+This matters because leave-one-mascon-out validates transfer across **space**, not across a
+temporal blackout — it cannot speak to gap-fill skill, and the gap test exists to fill that
+hole. Note also that the extrapolated component is the **trend**, which is exactly what the
+predictors cannot reproduce (R² ≈ 0.11 at unseen mascons); reconstruction quality therefore
+depends on the trend staying linear across the gap.
+
+> The basin-scale half behaves differently by design: it *drops* days spanning gaps longer
+> than one missing month rather than reconstructing them, because its target there would be
+> a 334-day straight-line interpolation anchored by nothing.
+
+**Independent validation** uses 656 quality-controlled CGWB dug wells inside the basin (Kuruva et al., *Sci Data* 12, 1609, 2025; [figshare](https://doi.org/10.6084/m9.figshare.29293877)), converted to groundwater storage anomalies via ΔGWS = −S<sub>y</sub>·Δh on the GRACE 2004–2010 baseline. Wells are quarterly, so they validate spatial pattern and seasonal amplitude, never daily structure.
 
 ## Running the project
 
@@ -89,7 +242,7 @@ data repository. After completing step 3, run ```earthengine authenticate```. Th
 for the earth-engine Python API is available [here](https://developers.google.com/earth-engine/guides/python_install). The Google Cloud CLI tools
 may be required for this GEE authentication step. Refer to the installation docs [here](https://cloud.google.com/sdk/docs/install-sdk).
 
-A GCloud project needs to be set up online (e.g., ```grace-grb```), with the GEE API service enabled (https://console.cloud.google.com/). Then set a default project using ```gcloud config set project grace-grb```. Additionally, you may need to run ```gcloud auth application-default set-quota-project grace-grb``` if prompted by the GCloud CLI. 
+A GCloud project needs to be set up online (e.g., ```grace-grb-ml```), with the GEE API service enabled (https://console.cloud.google.com/). Then set a default project using ```gcloud config set project grace-grb-ml```. Additionally, you may need to run ```gcloud auth application-default set-quota-project grace-grb-ml``` if prompted by the GCloud CLI. 
 After that, run ```earthengine authenticate```. The installation and authentication guide 
 for the earth-engine Python API is available [here](https://developers.google.com/earth-engine/guides/python_install). 
 
@@ -97,23 +250,63 @@ for the earth-engine Python API is available [here](https://developers.google.co
 
 See [main/README.md](main/README.md) for detailed documentation on methods and API reference.
 
-#### Quick Start
+#### Everything at once
 
 ```bash
 cd main
 
-# Run all analyses (random, temporal, spatial holdout) with all models
-python run_analysis.py --analysis all --compare
+# One-time: download the gridded stacks (~5 GB, ~15 min, hits Earth Engine)
+python gee_gridded_download.py
+python build_cube.py
 
-# Run specific analysis type
-python run_analysis.py --analysis temporal
-
-# Run with specific models only
-python run_analysis.py -a random -m bilstm_attention xgboost lightgbm
-
-# Generate monthly/seasonal TWS maps (after running temporal analysis)
-python generate_monthly_maps.py
+# Then regenerate every result in the project (both halves, 11 steps)
+bash run_full_pipeline.sh
 ```
+
+`run_full_pipeline.sh` is the single entry point. It logs to `run_full_pipeline.log`
+and continues past any failing step, so one broken stage never silently truncates
+the rest.
+
+#### Step by step
+
+**Step 0 — the GRACE target. Everything depends on this.**
+
+```bash
+python export_basin_grace.py --compare   # -> Data/TWS_GRACE_GEE.csv
+```
+
+Derives the basin-mean GRACE series from the same gridded mascon product the 0.1°
+pipeline uses, so both halves rest on one source. `--compare` reports agreement
+with the legacy `TWS_JPL.xlsx`.
+
+**Basin-scale (temporal downscaling)**
+
+```bash
+python run_analysis.py --analysis all --compare      # random + temporal holdouts
+python run_analysis.py --analysis temporal           # one holdout only
+python run_analysis.py -a random -m xgboost lightgbm # specific models
+
+python generate_monthly_maps.py                      # basin-scale summaries
+python analyze_results.py --holdout-dir ../Results/figures/temporal_holdout --n-boot 2000
+python analyze_results.py --leakage --models randomforest xgboost lightgbm
+python temporal_closure_validation.py --predictions-dir ../Results/figures/temporal_holdout
+python tune_hyperparameters.py                       # optional, Optuna
+```
+
+**Gridded (spatial downscaling to 0.1°)**
+
+```bash
+python wells_ingest.py                    # CGWB wells -> independent validation set
+python downscale_model.py --model xgboost # spatial CV + 0.1 deg product
+python downscale_model.py --skip-product  # spatial CV only (fast)
+python downscale_uncertainty.py           # per-pixel uncertainty ensemble
+python generate_gridded_maps.py           # maps from the gridded product
+python validate_wells.py                  # downscaled vs wells vs interpolation
+```
+
+> `--analysis spatial` is **retired** and exits with an explanation. The synthetic
+> spatial holdout leaked by construction; its replacement is
+> `python downscale_model.py --skip-product`.
 
 #### Available Models
 - `bilstm_attention` - BiLSTM with Attention mechanism
@@ -123,13 +316,25 @@ python generate_monthly_maps.py
 - `lightgbm` - LightGBM Regressor
 - `random_forest` - Random Forest Regressor
 
+Tree ensembles are used for the gridded pipeline; the recurrent models are
+basin-scale only.
+
 #### Output Files
-Results are saved to `Results/figures/` including:
+
+`Results/figures/` — basin-scale:
 - Model predictions (CSV) with train/test splits
-- Performance plots (actual vs predicted, residuals)
-- SHAP analysis plots (feature importance, dependence)
-- Model comparison summaries
-- Monthly/seasonal TWS maps with statistics (basin-scale)
-- Bootstrap confidence intervals and Diebold–Mariano significance tables for every metric
+- Performance plots (actual vs predicted, residuals), SHAP analysis, model comparison
+- Monthly/seasonal TWS summaries (basin-scale: the whole polygon takes one value)
+- Bootstrap confidence intervals and Diebold–Mariano significance tables
 - Leakage diagnostic (shuffled vs blocked vs purged + embargo cross-validation)
-- Temporal closure test (daily predictions re-aggregated to monthly vs original monthly GRACE)
+- Temporal closure test (daily predictions re-aggregated to monthly vs observed GRACE)
+
+`Results/downscaling/` — gridded:
+- `twsa_0p1deg_monthly_<model>.nc` — the 0.1° monthly TWSA product
+- `twsa_0p1deg_monthly_with_uncertainty.nc` — product + `sigma_total`, `sigma_grace`, `sigma_transfer`, `sigma_within`
+- `lomo_cv_<model>.csv` — leave-one-mascon-out skill per mascon
+- `transfer_rmse_by_mascon_season.csv` — spatial-transfer error by mascon and calendar month
+- `well_validation_summary.csv` — downscaled vs interpolation, scored against the wells
+
+`Results/figures/gridded_maps/` — per-pixel monthly climatology, seasonal means,
+trend, uncertainty components, and the downscaling-versus-interpolation comparison.

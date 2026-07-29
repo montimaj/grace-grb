@@ -1,4 +1,21 @@
 """
+SUPERSEDED FOR DAILY CLAIMS -- see METHODS.md.
+
+This module belongs to the BASIN-SCALE pipeline, which trains on a daily target
+obtained by LINEARLY INTERPOLATING the monthly GRACE series. No independent daily
+observation exists, so a model fitted this way learns partly to reproduce that
+interpolation, and its apparent daily skill measures fit to an assumption. The
+temporal closure test (`temporal_closure_validation.py`) exists precisely because
+daily skill cannot be validated directly from this dataset.
+
+The gridded pipeline takes the opposite route: the ML model is trained ONLY on
+observed monthly GRACE, and daily variation is added afterwards by physical
+disaggregation of ERA5-Land fluxes and states (`downscale_daily.py`), with no
+fitting and no invented target.
+
+Retained because it reproduces the basin-scale manuscript. Not the basis for any
+daily claim.
+
 Temporal Holdout Analysis for TWS Downscaling
 Performs time-based train-test split maintaining temporal order.
 """
@@ -7,20 +24,18 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 from sklearn.model_selection import TimeSeriesSplit
 
 from models import (
-    get_model, get_all_models, set_seed,
-    BiLSTMAttentionWrapper, BiLSTMWrapper, LSTMWrapper,
-    XGBoostWrapper, LightGBMWrapper, RandomForestWrapper
+    get_model, set_seed
 )
 from utils import (
     load_and_preprocess_data, create_lagged_features, prepare_features_target,
     calculate_metrics, plot_predictions, plot_training_loss,
     plot_feature_importance, plot_model_comparison, plot_train_test_comparison,
     save_predictions, save_full_predictions, create_summary_report, 
-    EvaluationMetrics, run_shap_analysis
+    run_shap_analysis
 )
 
 
@@ -427,7 +442,8 @@ def run_temporal_holdout_analysis(
             # Run time series CV if requested
             if run_cv:
                 print(f"\nRunning Time Series Cross-Validation for {model.name}...")
-                cv_result = temporal_cv(X, y, model_name, n_splits=cv_splits, seed=seed)
+                cv_result = temporal_cv(X, y, model_name, n_splits=cv_splits, seed=seed,
+                                **((tuned_params or {}).get(model_name, {})))
                 cv_results[model.name] = cv_result
             
         except Exception as e:
@@ -487,7 +503,7 @@ def main():
     """Main function for temporal holdout analysis."""
     # Configuration
     predictor_file = "All_Data.xlsx"
-    tws_file = "TWS_JPL.xlsx"
+    tws_file = "../Data/TWS_GRACE_GEE.csv"
     output_dir = "figures/temporal_holdout"
     
     # Check if data files exist

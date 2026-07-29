@@ -7,14 +7,13 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from matplotlib.patches import Patch
-from typing import Tuple, List, Dict, Optional, Union, Any
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from typing import Tuple, List, Dict, Optional, Any
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from dataclasses import dataclass
 from plot_style import (
     pretty_model, clean_feature, clean_features, R2, R2_BOLD,
-    SCI_COLORS, SCI_BLUE, SCI_ORANGE, SCI_AQUA, BAR, BAR_2,
+    BAR, BAR_2,
 )
 
 # Optional SHAP import
@@ -24,6 +23,10 @@ try:
 except ImportError:
     HAS_SHAP = False
     print("Warning: SHAP not installed. Install with: pip install shap")
+
+
+# JPL mascon lwe_thickness is centimetres; this project reports millimetres.
+TWS_CM_TO_MM = 10.0
 
 
 @dataclass
@@ -48,69 +51,203 @@ class EvaluationMetrics:
         return (f"MAE: {self.mae:.4f}, RMSE: {self.rmse:.4f}, "
                 f"R²: {self.r2:.4f}, NSE: {self.nse:.4f}, PBIAS: {self.pbias:.2f}%")
 
+MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December']
+
+# Keyed on lower-case names. TWS_JPL.xlsx contains 'January ' (trailing space,
+# 20 rows) and 'july' (lowercase); an exact-match map turned all 21 into NaT and
+# they were silently dropped -- 8.9% of the GRACE record, of which 20 were
+# Januaries spanning 2003-2024. Callers must .strip().lower() before lookup.
+MONTH_MAP = {m.lower(): i + 1 for i, m in enumerate(MONTH_NAMES)}
+
+
+MAX_GAP_DAYS = 62
+
+
+def grace_segments(obs_dates: pd.DatetimeIndex,
+                   daily: pd.DatetimeIndex) -> pd.DataFrame:
+    """
+    For each daily date, the observed GRACE months bracketing it.
+
+    GRACE observes monthly and has gaps, so the daily target is interpolated.
+    Two kinds of interpolation get conflated if you do not look at the span:
+
+      * BETWEEN ADJACENT OBSERVED MONTHS (~30 days) -- this is the method. The
+        daily target is an interpolation by construction, it is disclosed, and
+        the temporal closure test exists to validate it.
+      * ACROSS A GAP -- the GRACE/GRACE-FO transition is ~11 missing months,
+        which becomes a 334-day straight line anchored by nothing while the real
+        signal completed a full monsoon cycle. Training on that teaches the model
+        that storage is linear when precipitation says otherwise.
+
+    Returns a frame indexed like `daily` with:
+      prev, next   the bracketing observed month starts
+      span_days    distance between them (NaN outside the observed record)
+      segment      integer id of the interval between two observations
+
+    Used for two things that must agree:
+      1. bounding interpolation (`load_and_preprocess_data`)
+      2. grouping the random split, so no test day shares a segment with a
+         training day (`holdout_random`). Interpolated within a segment, a test
+         day is an exact linear blend of its neighbours -- reconstructible from
+         the training targets alone at R2 = 0.999997, with no predictors used.
+    """
+    obs = pd.Series(np.arange(len(obs_dates)), index=pd.DatetimeIndex(obs_dates))
+    daily = pd.DatetimeIndex(daily)
+    prev_i = obs.reindex(daily, method='ffill')
+    next_i = obs.reindex(daily, method='bfill')
+    prev_d = pd.Series(pd.NaT, index=daily, dtype='datetime64[ns]')
+    next_d = pd.Series(pd.NaT, index=daily, dtype='datetime64[ns]')
+    ok_p, ok_n = prev_i.notna(), next_i.notna()
+    prev_d[ok_p] = obs.index[prev_i[ok_p].astype(int)]
+    next_d[ok_n] = obs.index[next_i[ok_n].astype(int)]
+    return pd.DataFrame({
+        'prev': prev_d, 'next': next_d,
+        'span_days': (next_d - prev_d).dt.days,
+        'segment': prev_i,
+    }, index=daily)
+
+
+def read_grace_monthly(tws_file: str) -> pd.DataFrame:
+    """
+    Read the observed monthly GRACE TWSA series, in MILLIMETRES.
+
+    Single source of truth for GRACE ingestion, used by both
+    `load_and_preprocess_data` and `temporal_closure_validation`. Those two
+    previously carried independent copies of the month map and the unit
+    handling, which is how the closure test kept the month bug after `utils`
+    was fixed -- and would then have compared millimetre predictions against
+    centimetre observations.
+
+    Two accepted sources
+    --------------------
+    PREFERRED  `Data/TWS_GRACE_GEE.csv` -- the area-weighted basin mean computed
+        by `export_basin_grace.py` directly from NASA/GRACE/MASS_GRIDS_V04/
+        MASCON_CRI. Reproducible from code, already in millimetres, and the same
+        series the 0.1 degree downscaling uses, so both halves of the project
+        rest on one GRACE source.
+
+    LEGACY  `Data/TWS_JPL.xlsx` -- unrecorded provenance, malformed month names,
+        native centimetres despite being labelled millimetres, and correlating
+        only r = 0.94 with a proper basin mean of the product it claims to be
+        (difference std 56.8 mm against a 164 mm signal). Supported so earlier
+        results can be reproduced; not recommended.
+
+    Returns
+    -------
+    pd.DataFrame with columns ['Date', 'TWS'], sorted, one row per observed
+    month. Months GRACE did not observe are absent rather than interpolated.
+    """
+    if str(tws_file).lower().endswith('.csv'):
+        tws = pd.read_csv(tws_file, parse_dates=['Date'])
+    else:
+        tws = pd.read_excel(tws_file)
+        tws['Month_Num'] = (tws['Month'].astype(str)
+                            .str.strip().str.lower().map(MONTH_MAP))
+        unparsed = tws['Month_Num'].isna().sum()
+        if unparsed:
+            raise ValueError(
+                f'{unparsed} rows in {tws_file} have an unrecognised Month '
+                f'value: {sorted(tws.loc[tws.Month_Num.isna(), "Month"].unique())}')
+        tws['Date'] = pd.to_datetime(
+            dict(year=tws.Year, month=tws.Month_Num, day=1))
+        # Native centimetres -> millimetres, so the label and the number agree.
+        tws['TWS'] = tws['TWS'] * TWS_CM_TO_MM
+
+    return (tws[['Date', 'TWS']]
+            .sort_values('Date').drop_duplicates(subset='Date')
+            .reset_index(drop=True))
+
 
 def load_and_preprocess_data(
     predictor_file: str,
     tws_file: str,
     predictors: List[str] = None,
-    fill_missing: bool = True
+    fill_missing: bool = True,
+    max_gap_days: int = MAX_GAP_DAYS,
 ) -> pd.DataFrame:
     """
-    Load and preprocess predictor and TWS data.
-    
-    Parameters
-    ----------
-    predictor_file : str
-        Path to the predictor data Excel file
-    tws_file : str
-        Path to the TWS data Excel file
-    predictors : List[str], optional
-        List of predictor column names
-    fill_missing : bool
-        Whether to fill missing values
-    
-    Returns
-    -------
-    pd.DataFrame
-        Merged and preprocessed dataframe
+    Load predictors and the GRACE target, and merge them on date.
+
+    `max_gap_days` bounds how far apart two observed GRACE months may be for the
+    days between them to be kept. The default (62 days) allows one missing month
+    and rejects longer gaps, notably the ~11-month GRACE/GRACE-FO transition.
+    A `grace_segment` column is returned so downstream splits can group on it.
+
+    NOTE on "daily" results: GRACE observes TWSA MONTHLY. The daily target is a
+    linear interpolation of the monthly series, so it contains no independent
+    daily observations and direct daily validation is impossible from this
+    dataset. Daily-scale consistency is assessed instead by the temporal closure
+    test (`temporal_closure_validation.py`), which re-aggregates the daily
+    predictions to monthly and compares them against the ORIGINAL observations.
     """
     if predictors is None:
         predictors = ['SMS', 'ET', 'rainfall', 'runoff', 'GWSA']
-    
-    # Load data
+
     all_data = pd.read_excel(predictor_file)
-    tws_data = pd.read_excel(tws_file)
-    
-    # Fill missing values in predictors
+
+    # Recover GWSA from runoff rather than losing the tail of the record.
+    #
+    # `GWSA` in All_Data.xlsx is exactly `runoff - mean(runoff)` (verified by
+    # linear-identity test, max residual 1.8e-15) -- it contains no groundwater
+    # data despite the name. Its 366 trailing NaNs are an artefact of how that
+    # spreadsheet was assembled, not a limit of the underlying data: `runoff`
+    # (ERA5-Land surface runoff) has complete coverage. Recomputing restores the
+    # whole 2024 tail from real observations, and puts the column's definition
+    # in code instead of baked invisibly into a spreadsheet.
+    if 'runoff' in all_data.columns and 'GWSA' in all_data.columns:
+        missing = all_data['GWSA'].isna().sum()
+        all_data['GWSA'] = all_data['runoff'] - all_data['runoff'].mean()
+        if missing:
+            print(f'  GWSA: recomputed from runoff, recovering {missing} rows')
+
+    # Fill INTERIOR gaps only, and never fabricate outside the observed span.
+    #
+    # The previous `.bfill().ffill()` filled in both directions without limit.
+    # That was not gap-filling: these columns have ZERO interior gaps, so bfill
+    # only ever extended a flat constant across the leading edge -- 396 days for
+    # SMS and ET, whose source (GLDAS V022 CLSM) simply does not exist before
+    # 2003-02-01. A constant predictor carries no information, yet still
+    # generates training rows and can land in the random-holdout test set.
+    #
+    # `limit_area='inside'` interpolates only between real observations, so
+    # genuine interior gaps are filled while the edges stay NaN and are dropped.
     if fill_missing:
         for col in ['SMS', 'ET', 'GWSA']:
             if col in all_data.columns:
-                all_data[col] = all_data[col].bfill().ffill()
-    
-    # Convert month name to number and create datetime
-    month_map = {month: i+1 for i, month in enumerate([
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'])}
-    
-    tws_data['Month_Num'] = tws_data['Month'].map(month_map)
-    tws_data['Date'] = pd.to_datetime(dict(year=tws_data.Year, month=tws_data.Month_Num, day=1))
-    
-    # NOTE (important for interpreting "daily" results): GRACE observes TWSA at
-    # MONTHLY resolution only. The daily target used to train the models is
-    # obtained by LINEARLY INTERPOLATING the monthly series to daily steps below.
-    # Consequently the daily target contains no independent daily observations,
-    # and direct daily validation is not possible from this dataset. Daily-scale
-    # skill is therefore assessed indirectly via the temporal closure test
-    # (see temporal_closure_validation.py): predicted daily TWSA is re-aggregated
-    # to monthly and compared against the ORIGINAL observed monthly GRACE.
-    tws_data = tws_data.sort_values('Date').drop_duplicates(subset='Date')
-    tws_data.set_index('Date', inplace=True)
-    tws_monthly = tws_data['TWS'].resample('D').interpolate(method='linear').reset_index()
-    
-    # Merge with predictor dataset
-    merged = pd.merge(all_data, tws_monthly, on='Date', how='inner')
-    
-    return merged
+                before = all_data[col].isna().sum()
+                all_data[col] = all_data[col].interpolate(
+                    method='linear', limit_area='inside')
+                after = all_data[col].isna().sum()
+                if before - after:
+                    print(f'  {col}: interpolated {before - after} interior gaps')
+
+    present = [c for c in ['SMS', 'ET', 'GWSA'] if c in all_data.columns]
+    if present:
+        n0 = len(all_data)
+        all_data = all_data.dropna(subset=present)
+        if len(all_data) < n0:
+            print(f'  dropped {n0 - len(all_data)} rows outside the predictor '
+                  f'record (not fabricated by back-fill)')
+
+    tws = read_grace_monthly(tws_file).set_index('Date')
+    tws_daily = (tws['TWS'].resample('D')
+                 .interpolate(method='linear').reset_index())
+
+    # Drop days whose bracketing observations are too far apart. Note this is
+    # NOT `interpolate(limit=...)`: pandas fills the FIRST `limit` NaNs of a run
+    # and leaves the rest, so a 334-day gap would keep 62 fabricated days plus a
+    # hole. Rejecting on the bracketing span removes whole gaps instead.
+    seg = grace_segments(tws.index, pd.DatetimeIndex(tws_daily['Date']))
+    keep = seg['span_days'].to_numpy() <= max_gap_days
+    n_drop = int((~keep).sum())
+    if n_drop:
+        print(f'  dropped {n_drop} interpolated days spanning GRACE gaps '
+              f'longer than {max_gap_days} days (not observed, not fabricated)')
+    tws_daily = tws_daily[keep]
+    tws_daily['grace_segment'] = seg['segment'].to_numpy()[keep]
+
+    return pd.merge(all_data, tws_daily, on='Date', how='inner')
 
 
 def create_lagged_features(
@@ -214,8 +351,13 @@ def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> EvaluationMetri
     denom = np.sum((y_true - np.mean(y_true)) ** 2)
     nse = float(1 - (np.sum((y_true - y_pred) ** 2) / denom)) if denom != 0 else np.nan
 
-    # Percent Bias
-    pbias = 100 * np.sum(y_pred - y_true) / np.sum(y_true)
+    # Percent Bias. Guarded: for a mean-zero target (an anomaly about its own
+    # mean, as used by the gridded downscaling) the denominator collapses and
+    # the ratio explodes to meaningless magnitudes. Report NaN instead.
+    if np.abs(np.sum(y_true)) > 0.01 * np.sum(np.abs(y_true)):
+        pbias = float(100 * np.sum(y_pred - y_true) / np.sum(y_true))
+    else:
+        pbias = np.nan
 
     return EvaluationMetrics(mae=mae, rmse=rmse, r2=r2, nse=nse, pbias=pbias)
 
@@ -907,7 +1049,7 @@ def create_summary_report(
     report_lines.extend([
         "",
         f"{'='*60}",
-        f"Report generated successfully",
+        "Report generated successfully",
         f"{'='*60}"
     ])
     
