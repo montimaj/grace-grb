@@ -216,3 +216,4 @@ TODO.md
 
 # Claude Code local config (shared settings intentionally not tracked)
 .claude/
+Outputs/

@@ -1,9 +1,9 @@
-# Spatial Downscaling and Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin
+# Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin
 
 ## Citation
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Spatial Downscaling and Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
 
-> Title revised from "Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin". The original wording described the earlier basin-scale analysis and, applied to this work, would overstate the daily component: the daily field is disaggregated under an exact monthly constraint, not downscaled. See [METHODS.md](METHODS.md) for the distinction.
+> Title revised from "Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin". The original described the earlier basin-scale analysis, and its "temporal downscaling" would overstate the daily component of this work: the daily field is disaggregated under an exact monthly constraint, not downscaled. "Downscaling" now attaches to the spatial step, where a predictor–TWSA relation is fitted across mascons and interpreted with SHAP; the daily step is disaggregation, its within-month shape supplied by the ERA5-Land water balance with nothing fitted. See [METHODS.md](METHODS.md) for the distinction.
 
 ## Abstract
 
