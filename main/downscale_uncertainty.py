@@ -23,6 +23,8 @@ observation.
                   reproduce GRACE at mascon scale, whatever spread remains is
                   purely disagreement about how storage is distributed WITHIN a
                   mascon -- the fine-scale structure that GRACE cannot see.
+                  Four members: two boosting (xgboost, lightgbm) and two bagging
+                  (random_forest, xgboost_rf). See DEFAULT_MODELS.
 
 The honest caveat, stated in the file's own metadata
 ----------------------------------------------------
@@ -55,7 +57,37 @@ import downscale_features as F
 import downscale_grid_ops as ops
 import downscale_model as M
 
-DEFAULT_MODELS: Tuple[str, ...] = ('random_forest', 'xgboost', 'lightgbm')
+# Four members, spanning both tree families rather than three of one.
+#
+# `sigma_within` is the spread ACROSS these after mass conservation, so which
+# members are present is not a wiring detail -- it sets a band shipped in the
+# product. Two boosting implementations (xgboost, lightgbm) and two bagging ones
+# (random_forest, xgboost_rf) is a more honest sample of "defensible methods"
+# than 2:1, and a standard deviation over four values is less jumpy than over
+# three.
+#
+# Be careful how much is claimed for it: xgboost_rf bags much as random_forest
+# does, differing in split finding and L2 regularisation rather than in
+# principle. Adding it widens the sample without making the members independent,
+# and the LOWER BOUND caveat below is unaffected -- four correlated members still
+# agree more than they are jointly correct.
+#
+# THE MLP IS DELIBERATELY NOT A MEMBER, though `--models` will accept it.
+#
+# It exists for the model COMPARISON (downscale_model.py, downscale_holdouts.py),
+# where a non-tree function class is exactly the point. Putting it in the
+# ensemble is a different decision, because `sigma_within` is a band shipped in
+# the product: a member that is structurally unlike the others would widen the
+# spread, and a reader could not tell whether that reflected genuine uncertainty
+# about within-mascon structure or simply an architecture that suits this design
+# less well.
+#
+# Revisit if the comparison shows the MLP performing comparably on held-out
+# skill. Until then, adding it would inflate a number we already label a lower
+# bound, in a direction that flatters the uncertainty estimate rather than the
+# product.
+DEFAULT_MODELS: Tuple[str, ...] = ('random_forest', 'xgboost', 'lightgbm',
+                                   'xgboost_rf')
 
 
 # --------------------------------------------------------------------------
@@ -282,10 +314,23 @@ def gap_recovery_error(
         test = obs & np.isin(t_all, list(hidden))
         if train.sum() < 1000 or test.sum() < 10:
             continue
+        # Refit the level+trend background on the surviving months only. The
+        # `anom` passed in was decomposed over the whole record, so the hidden
+        # months helped fit the line that is then subtracted from them -- which
+        # is precisely the information a real blackout does not have. On the
+        # forward split of downscale_holdouts.py the same leak was worth 13.9 mm
+        # RMSE, and here it would propagate into sigma_gap, understating the
+        # error bar on exactly the months that carry no observation.
+        _, anom_g, _ = M.decompose_target(fs, fit_mask=train)
+        ok = np.isfinite(anom_g)
+        tr, te = train & ok, test & ok
+        if tr.sum() < 1000 or te.sum() < 10:
+            continue
         mdl = M.make_model(model_name)
-        mdl.fit(X_all[train], anom[train])
-        pred = mdl.predict(X_all[test])
-        err = pred - anom[test]
+        mdl.fit(X_all[tr], anom_g[tr])
+        pred = mdl.predict(X_all[te])
+        err = pred - anom_g[te]
+        test = te
         # Depth = distance from the training edge. Backward gaps count from the
         # far end, so month 1 is always the one nearest surviving training data.
         if mode == 'backward':
@@ -385,6 +430,7 @@ def sigma_gap_field(
 
 def run_ensemble(
     model_names: Sequence[str] = DEFAULT_MODELS,
+    seeds: Sequence[int] = (20,),
     verbose: bool = True,
 ) -> Dict[str, object]:
     """Fit every member, predict at 0.1 degrees, conserve mass, collect spread."""
@@ -419,27 +465,57 @@ def run_ensemble(
     obs_mascon = ops.aggregate_area_weighted(F.load_grace_monthly(months), w_coarse)
 
     X = fs.X.to_numpy(dtype='float32')[obs]
-    members: List[np.ndarray] = []
+    # (n_families, n_seeds) grid of fields, so the two sources of spread can be
+    # separated rather than mixed. See the sigma_within / sigma_seed note below.
+    grid_fields: List[List[np.ndarray]] = []
     cells: Optional[np.ndarray] = None
     diag: Dict[str, float] = {}
 
     for name in model_names:
-        print(f'  {name}', flush=True)
-        mdl = M.make_model(name)
-        mdl.fit(X, anom[obs])
-        anom_fine, cells = M.predict_fine(mdl, months, list(fs.X.columns),
-                                          verbose=False)
-        raw = M.base_field_fine(coef, months, cells) + anom_fine
-        conserved, diag = M.conserve_mass(
-            raw, obs_mascon, w_mascon,
-            (grids['era5'].n_y, grids['era5'].n_x), cells)
-        members.append(conserved)
-        print(f'    conservation residual max {diag["max_abs_error_mm"]:.2e} mm')
+        per_seed: List[np.ndarray] = []
+        for sd in seeds:
+            label = f'  {name}' + (f' (seed {sd})' if len(seeds) > 1 else '')
+            print(label, flush=True)
+            mdl = M.make_model(name, seed=sd)
+            mdl.fit(X, anom[obs])
+            anom_fine, cells = M.predict_fine(mdl, months, list(fs.X.columns),
+                                              verbose=False)
+            raw = M.base_field_fine(coef, months, cells) + anom_fine
+            conserved, diag = M.conserve_mass(
+                raw, obs_mascon, w_mascon,
+                (grids['era5'].n_y, grids['era5'].n_x), cells)
+            per_seed.append(conserved)
+            print(f'    conservation residual max {diag["max_abs_error_mm"]:.2e} mm')
+        grid_fields.append(per_seed)
 
-    stack = np.stack(members)                     # (n_members, n_time, n_cells)
-    mean = stack.mean(axis=0)
-    # ddof=1: spread of a small sample of model families, not of a population.
-    within = stack.std(axis=0, ddof=1) if len(members) > 1 else np.zeros_like(mean)
+    # (n_families, n_seeds, n_time, n_cells)
+    stack = np.stack([np.stack(s) for s in grid_fields])
+    mean = stack.mean(axis=(0, 1))
+
+    # TWO spreads, kept apart.
+    #
+    # `sigma_within` is disagreement BETWEEN MODEL FAMILIES. Averaging over seeds
+    # first removes each family's own sampling noise from that comparison, so the
+    # term means what its name says.
+    #
+    # `sigma_seed` is the spread WITHIN a family across random seeds -- bootstrap
+    # draws in the forest, subsample/colsample draws in the boosters -- averaged
+    # over families. Previously every member was fitted at one fixed seed, so
+    # this variation was absent from the reported uncertainty entirely and
+    # `sigma_within` was a lower bound in a way that was never stated.
+    #
+    # They are reported separately rather than summed into one number because
+    # they answer different questions: "would another defensible method give this
+    # answer?" and "would another run of THIS method?". Folding them together
+    # would leave a reader unable to recover either.
+    family_means = stack.mean(axis=1)                     # (n_families, t, cells)
+    within = (family_means.std(axis=0, ddof=1) if len(model_names) > 1
+              else np.zeros_like(mean))
+    if len(seeds) > 1:
+        # std over seeds within each family, then averaged across families
+        sigma_seed = stack.std(axis=1, ddof=1).mean(axis=0)
+    else:
+        sigma_seed = None
 
     print('\n5. Assembling uncertainty terms')
     sigma_grace = grace_uncertainty_field(months, cells)
@@ -452,22 +528,30 @@ def run_ensemble(
                                          np.ones(len(months), bool)))
     sigma_gap = sigma_gap_field(gap_tables, months, observed_month, len(cells))
 
-    sigma_total = np.sqrt(sigma_grace ** 2 + sigma_transfer ** 2
-                          + within ** 2 + sigma_gap ** 2)
+    # sigma_seed joins the quadrature sum only when it was actually measured.
+    # With one seed it is not zero-but-known, it is UNMEASURED, and adding a
+    # zero would understate sigma_total while looking like a result.
+    terms = [sigma_grace, sigma_transfer, within, sigma_gap]
+    if sigma_seed is not None:
+        terms.append(sigma_seed)
+    sigma_total = np.sqrt(sum(t ** 2 for t in terms))
 
     n_gap = int((~observed_month).sum())
     print(f'  {n_gap} of {len(months)} months are gap-filled (no GRACE observation)')
     for label, arr in [('sigma_grace', sigma_grace),
                        ('sigma_transfer', sigma_transfer),
                        ('sigma_within', within),
+                       *(( ('sigma_seed', sigma_seed),) if sigma_seed is not None else ()),
                        ('sigma_gap', sigma_gap),
                        ('sigma_total', sigma_total)]:
         print(f'  {label:15s} median {np.nanmedian(arr):7.1f} mm   '
               f'p90 {np.nanpercentile(arr, 90):7.1f} mm')
 
     return dict(mean=mean, sigma_grace=sigma_grace, sigma_transfer=sigma_transfer,
-                sigma_within=within, sigma_gap=sigma_gap, sigma_total=sigma_total,
+                sigma_within=within, sigma_gap=sigma_gap, sigma_seed=sigma_seed,
+                sigma_total=sigma_total,
                 cells=cells, months=months, table=table, members=model_names,
+                seeds=list(seeds),
                 diag=diag, gap_table=gap_tbl, grace_observed=observed_month)
 
 
@@ -503,6 +587,13 @@ def write(result: Dict[str, object], path: str) -> str:
         'sigma_gap': (result['sigma_gap'], 'mm',
                       'Extra uncertainty where GRACE did not observe (gap-filled months)'),
     }
+    # Only written when measured (more than one seed). A single-seed run omits
+    # the variable entirely rather than shipping zeros, so its absence is
+    # legible: the term was not estimated, as against estimated to be nil.
+    if result.get('sigma_seed') is not None:
+        fields['sigma_seed'] = (
+            result['sigma_seed'], 'mm',
+            'Within-family spread across random seeds, averaged over families')
 
     with netCDF4.Dataset(path, 'w', format='NETCDF4') as ds:
         ds.createDimension('time', len(months))
@@ -547,6 +638,14 @@ def write(result: Dict[str, object], path: str) -> str:
         gv[:] = obs_flag.astype('i1')
         ds.n_months_gap_filled = int((~obs_flag).sum())
         ds.ensemble_members = ', '.join(result['members'])   # type: ignore[arg-type]
+        for _k, _v in M.provenance().items():
+            setattr(ds, f'provenance_{_k}', str(_v))
+        ds.ensemble_seeds = ', '.join(str(s) for s in result.get('seeds', []))
+        if result.get('sigma_seed') is None:
+            ds.sigma_seed_status = ('not estimated: a single seed was used, so '
+                                    'within-family stochastic spread is absent from '
+                                    'sigma_total and sigma_within is a lower bound '
+                                    'in that respect too')
         ds.title = ('Downscaled GRACE TWSA with per-pixel uncertainty, '
                     'Ganga basin, 0.1 degree, monthly')
         ds.baseline = '2004.0-2010.0 (JPL RL06 mascon convention)'
@@ -561,11 +660,17 @@ def write(result: Dict[str, object], path: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--seeds', nargs='+', type=int, default=[20],
+                    help='Random seeds per family. More than one measures '
+                         'sigma_seed (within-family stochastic spread); with a '
+                         'single seed that term is NOT emitted, because it would '
+                         'be unmeasured rather than zero. Cost is one full fit '
+                         'per family per seed.')
     ap.add_argument('--models', nargs='+', default=list(DEFAULT_MODELS),
-                    choices=['random_forest', 'xgboost', 'lightgbm'])
+                    choices=['random_forest', 'xgboost', 'lightgbm', 'xgboost_rf', 'mlp'])
     args = ap.parse_args()
 
-    result = run_ensemble(args.models)
+    result = run_ensemble(args.models, seeds=args.seeds)
     out = write(result, os.path.join(
         M.RESULTS_DIR, 'twsa_0p1deg_monthly_with_uncertainty.nc'))
     result['table'].to_csv(                                  # type: ignore[union-attr]

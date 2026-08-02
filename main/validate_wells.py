@@ -11,12 +11,17 @@ The comparison
 GRACE measures TOTAL water storage. Wells measure the groundwater component
 only. To compare them the other stores have to come off:
 
-    GWS = TWSA - (root-zone soil moisture + snow water equivalent + canopy)
+    GWS = TWSA - (root-zone soil moisture + snow water equivalent [+ canopy])
 
-with the subtracted terms taken from GLDAS CLSM and, like TWSA, expressed as
-anomalies about the same 2004.0-2010.0 baseline. What remains is compared with
+with the subtracted terms expressed, like TWSA, as anomalies about the same
+2004.0-2010.0 baseline. What remains is compared with
 
     GWS_well = -Sy * (depth - depth_baseline) * 1000       [mm]
+
+Two definitions of those stores are available (see STORE_SETS): ERA5-Land layers
+1-3 plus snow at native 0.1 degrees, which is the DEFAULT, or GLDAS 2.1 NOAH
+root-zone plus snow plus canopy at 0.25 degrees. NOT GLDAS 2.2 CLSM, which
+assimilates GRACE and was dropped from this project entirely.
 
 Note the residual carries the errors of the subtracted model stores as well as
 of the downscaling, so disagreement is an upper bound on downscaling error.
@@ -61,40 +66,86 @@ import downscale_model as M
 import wells_ingest as W
 
 BASELINE = (W.BASELINE_START, W.BASELINE_END)
-# GLDAS stores subtracted from TWSA to isolate groundwater.
+
+# The non-groundwater stores subtracted from TWSA, and where they come from.
 #
-# ROOT-ZONE, not PROFILE. GLDAS CLSM's `SoilMoist_P_tavg` is the full soil
-# profile, which already contains the modelled groundwater store: subtracting it
-# removes part of the very quantity the wells are supposed to validate, so the
-# residual is not groundwater at all. `SoilMoist_RZ_tavg` stops above the water
-# table, leaving TWSA - (root-zone SM + snow + canopy) ~ groundwater.
-STORE_VARS = ('rzsm', 'swe_gldas', 'canopy')
+# ROOT-ZONE, not FULL PROFILE, in both definitions. A full-profile soil moisture
+# already contains the modelled groundwater store, so subtracting it removes part
+# of the very quantity the wells are supposed to validate and the residual is not
+# groundwater at all. Both options below stop above the water table.
+#
+# 'gldas'  GLDAS 2.1 NOAH RootMoist_inst + SWE + canopy interception, at 0.25 deg
+#          and bilinearly upsampled to 0.1 deg. INDEPENDENT of the predictors,
+#          which are all ERA5-Land -- so the residual does not inherit ERA5's
+#          soil-moisture bias on both sides of the subtraction. NOAH has no
+#          groundwater store at all, so nothing here can double-count it.
+#          Its weakness is resolution: the subtracted field carries no structure
+#          finer than 0.25 deg, in a comparison made at 0.1 deg.
+#
+# 'era5'   ERA5-Land layers 1-3 (0-100 cm, thicknesses 70/210/720 mm) + snow
+#          water equivalent, NATIVE 0.1 deg, no regridding. Matches the product
+#          grid and the 0-100 cm root-zone convention `gee_download.py` already
+#          uses for `rzsm_era5`. No canopy term exists in the download; canopy
+#          interception is ~mm against hundreds of mm of soil moisture, so the
+#          omission is small but real. Its weakness is the mirror of GLDAS's:
+#          predictors and subtracted stores now share a model.
+#
+# Neither is obviously right, so both are selectable with `--stores`.
+STORE_SETS: Dict[str, Dict[str, object]] = {
+    'gldas': {'grid': 'gldas', 'vars': ('rzsm', 'swe_gldas', 'canopy')},
+    'era5': {'grid': 'era5', 'vars': ('vsw1', 'vsw2', 'vsw3', 'swe')},
+}
+# ERA5 is the default because it is native to the product's own 0.1 degree grid.
+# Subtracting a 0.25 degree field inside a comparison made at 0.1 degrees puts a
+# resolution mismatch into the groundwater residual before the test runs. Its
+# cost is the shared model noted above; `--stores gldas` is the alternative that
+# avoids it.
+#
+# These are ALTERNATIVES, not an experiment. Every released number uses the
+# default. No cross-store comparison is run or reported.
+DEFAULT_STORES = 'era5'
+
+# Kept for backward compatibility with callers that imported the old name.
+STORE_VARS = STORE_SETS['gldas']['vars']
 
 
-def gldas_storage_anomaly(months: pd.DatetimeIndex, cells: np.ndarray) -> np.ndarray:
+def storage_anomaly(months: pd.DatetimeIndex, cells: np.ndarray,
+                    stores: str = DEFAULT_STORES) -> np.ndarray:
     """
-    Soil moisture + snow + canopy storage on the 0.1 degree grid, as anomalies
-    about the GRACE baseline. Returns (n_months, n_cells) in mm.
+    Non-groundwater storage on the 0.1 degree grid, as anomalies about the GRACE
+    baseline. Returns (n_months, n_cells) in mm.
+
+    Regridding happens only when the source grid is not already the target: the
+    ERA5 set is native 0.1 deg and is used as-is.
     """
+    if stores not in STORE_SETS:
+        raise ValueError(f'stores must be one of {sorted(STORE_SETS)}, got {stores!r}')
+    spec = STORE_SETS[stores]
     grids = cfg.build_grids()
-    gldas, era5 = grids['gldas'], grids['era5']
+    src, era5 = grids[spec['grid']], grids['era5']
 
     total = None
-    for var in STORE_VARS:
-        field = F.monthly_mean('gldas', var, months)
-        fine = ops.regrid_bilinear(field, gldas, era5)
+    for var in spec['vars']:
+        field = F.monthly_mean(spec['grid'], var, months)
+        fine = field if spec['grid'] == 'era5' else ops.regrid_bilinear(field, src, era5)
         total = fine if total is None else total + fine
 
     flat = total.reshape(len(months), -1)[:, cells]
     in_base = ((months >= pd.Timestamp(BASELINE[0]))
                & (months <= pd.Timestamp(BASELINE[1])))
-    with np.errstate(invalid='ignore'):
+    with F.allnan_ok():
         baseline = np.nanmean(flat[in_base], axis=0, keepdims=True)
     return flat - baseline
 
 
+def gldas_storage_anomaly(months: pd.DatetimeIndex, cells: np.ndarray) -> np.ndarray:
+    """Deprecated alias for `storage_anomaly(..., stores='gldas')`."""
+    return storage_anomaly(months, cells, stores='gldas')
+
+
 def match_wells(
-    product_path: Optional[str] = None, verbose: bool = True
+    product_path: Optional[str] = None, verbose: bool = True,
+    stores: str = DEFAULT_STORES,
 ) -> Tuple[pd.DataFrame, Dict[str, object]]:
     """
     Join well observations to the co-located product pixel, for both the
@@ -133,8 +184,8 @@ def match_wells(
     bilinear_full = np.full((len(months), era5.n_cells), np.nan)
     bilinear_full[:, cells] = base['bilinear']
 
-    stores = np.full((len(months), era5.n_cells), np.nan)
-    stores[:, cells] = gldas_storage_anomaly(months, cells)
+    store_field = np.full((len(months), era5.n_cells), np.nan)
+    store_field[:, cells] = storage_anomaly(months, cells, stores=stores)
 
     # Mascon label per fine cell, so skill can be reported per mascon.
     mascon_fine = aux['mascon_id'].ravel()[aux['parent_era5_to_grace'].ravel()]
@@ -147,8 +198,8 @@ def match_wells(
     obs['flat'] = obs.well_id.map(meta.era5_flat).astype(int)
 
     ti, fi = obs.tidx.to_numpy(), obs.flat.to_numpy()
-    obs['gws_downscaled'] = flat_twsa[ti, fi] - stores[ti, fi]
-    obs['gws_bilinear'] = bilinear_full[ti, fi] - stores[ti, fi]
+    obs['gws_downscaled'] = flat_twsa[ti, fi] - store_field[ti, fi]
+    obs['gws_bilinear'] = bilinear_full[ti, fi] - store_field[ti, fi]
     if flat_sigma is not None:
         obs['sigma_total'] = flat_sigma[ti, fi]
     obs['mascon'] = mascon_fine[fi]
@@ -156,7 +207,8 @@ def match_wells(
     obs['lon'] = obs.well_id.map(meta.lon)
 
     obs = obs.dropna(subset=['gws_downscaled', 'gws_bilinear', 'gws_anomaly_mm'])
-    return obs, {'product': path, 'months': months, 'n_wells': obs.well_id.nunique()}
+    return obs, {'product': path, 'months': months,
+                 'n_wells': obs.well_id.nunique(), 'stores': stores}
 
 
 def score(obs: pd.DataFrame) -> pd.DataFrame:
@@ -221,10 +273,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--product', default=None)
+    ap.add_argument('--stores', default=DEFAULT_STORES, choices=sorted(STORE_SETS),
+                    help='Which non-groundwater stores to subtract from TWSA.')
     args = ap.parse_args()
 
     print('Independent validation against CGWB dug wells\n')
-    obs, info = match_wells(args.product)
+    obs, info = match_wells(args.product, stores=args.stores)
+    print(f'stores subtracted: {args.stores} '
+          f'({", ".join(STORE_SETS[args.stores]["vars"])})')
     print(f'\nproduct: {os.path.basename(str(info["product"]))}')
     print(f'matched: {len(obs):,} well-months across {info["n_wells"]} wells\n')
 

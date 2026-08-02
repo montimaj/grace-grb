@@ -1,0 +1,120 @@
+# Citation metadata for the CODE in this repository.
+#
+# The data products are a SEPARATE Zenodo record with its own DOI and its own
+# licence -- see DATA_README.md. One record carries one licence, and the data
+# licence cannot be GPL (DATA_README.md, "Licence").
+#
+# THIS FILE IS IGNORED BY ZENODO WHENEVER .zenodo.json IS PRESENT. Zenodo does
+# not merge the two: if .zenodo.json exists it builds the record from that file
+# alone and never reads this one. This file drives GitHub's "Cite this
+# repository" button and nothing else, so the two must be kept in step by hand.
+#
+# BEFORE TAGGING A RELEASE, replace every TODO- token here AND in .zenodo.json:
+#   grep -rn 'TODO-' CITATION.cff .zenodo.json DATA_README.md README.md Data/README.md Results/README.md
+# The GitHub-Zenodo integration publishes on release, and a published Zenodo
+# record cannot be deleted -- only a new version can be added on top of it.
+#
+# Outstanding, and NOT guessable from anything in this repository:
+#   TODO-AUTHOR-*        author list, in manuscript order
+#   TODO-ORCID-*         ORCIDs (schema requires the full https://orcid.org/ URL)
+#   TODO-AFFILIATION-*   affiliations
+#   TODO-VERSION         git tag; no tags exist yet (`git tag -l` is empty)
+#   TODO-RELEASE-DATE    date-released, added at tag time
+#   (the concept DOI is now known: 10.5281/zenodo.21745158, set under `identifiers` below)
+# README.md's citation block names six authors for the manuscript. It is a
+# starting point, not authority: the deposit must match the accepted paper.
+
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: >-
+  Downscaled GRACE terrestrial water storage anomalies for the Ganga (Ganges) River Basin at 0.1°: Monthly and daily fields with per-pixel uncertainty, 2000–2025
+type: software
+
+authors:
+  - family-names: Kaushik
+    given-names: P. R.
+    affiliation: "CSIRO Environment, Dutton Park, Queensland 4102, Australia"
+    orcid: "https://orcid.org/0000-0003-3826-7862"
+  - family-names: Majumdar
+    given-names: S.
+    affiliation: "Division of Hydrologic Sciences, Desert Research Institute, Reno, Nevada, USA"
+    orcid: "https://orcid.org/0000-0002-3539-0147"
+  - family-names: Lenczuk
+    given-names: A.
+    affiliation: "Faculty of Civil Engineering and Geodesy, Military University of Technology, Warsaw, Poland"
+    orcid: "https://orcid.org/0000-0002-9573-1302"
+  - family-names: Sharma
+    given-names: Y. K.
+    affiliation: "Department of Civil Engineering, College of Engineering, Kyung Hee University, Yongin, Republic of Korea"
+    orcid: "https://orcid.org/0009-0006-0038-5125"
+  - family-names: Banerjee
+    given-names: S.
+    affiliation: "Department of Soil and Water Systems, University of Idaho-Boise, Boise, Idaho, USA"
+    orcid: "https://orcid.org/0009-0003-6139-8403"
+  - family-names: Thakur
+    given-names: P. K.
+    affiliation: "Water Resources Department, Indian Institute of Remote Sensing, ISRO, Dehradun, India"
+    orcid: "https://orcid.org/0000-0002-2719-7021"
+  # Names and order follow the manuscript citation. Every ORCID was checked
+  # against its ISO 7064 MOD 11-2 check digit before being written here.
+
+abstract: >-
+  Code for a 0.1 degree monthly and daily terrestrial water storage anomaly
+  (TWSA) product over the Ganga (Ganges) river basin, 2000-2025. GRACE and
+  GRACE-FO JPL RL06 mascons are spatially downscaled by fitting a
+  predictor-TWSA relation across mascons with tree ensembles, and every
+  mascon's area-weighted aggregate is then forced back onto the observed
+  value. The monthly field is disaggregated to daily under an exact monthly
+  constraint, its within-month shape supplied by the ERA5-Land water balance
+  with nothing fitted. Per-pixel uncertainty is reported as separate terms
+  rather than one number, because only some of them are measurable against an
+  observation. Fine spatial structure is inferred from ERA5-Land and GLDAS,
+  not observed, and agreement with GRACE at mascon scale is imposed by mass
+  conservation rather than earned; the held-out evidence is a
+  leave-one-mascon-out cross-validation over 19 mascons and a comparison
+  against 656 quality-controlled CGWB dug wells.
+
+version: 1.0.0
+date-released: 2026-08-01
+#   Left absent rather than stubbed: the schema requires a real date here, so a
+#   placeholder string would fail validation outright.
+license: CC-BY-4.0
+# The record bundles code and data. CC-BY-4.0 describes the DATA; the source
+# code in the same archive stays GPL-3.0-only under its own LICENSE file.
+# A Zenodo record has one licence field, so the carve-out lives in the
+# description rather than here.
+# GPL-3.0-only, not -or-later: LICENSE is the verbatim GPLv3 text and no "or
+# later" notice appears in any source file or in LICENSE's own application
+# section. If the notice is wanted, add it BEFORE the release -- the archive is
+# permanent. See TODO.md D2.
+
+repository-code: "https://github.com/montimaj/grace-grb"
+url: "https://github.com/montimaj/grace-grb"
+
+# The VERSION DOI is what a paper should cite: it pins v1.0.0 rather than
+# whatever was released last. The concept DOI is the "all versions" line and is
+# listed second.
+doi: 10.5281/zenodo.21745159
+
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21745159
+    description: Version DOI for v1.0.0 - cite this one
+  - type: doi
+    value: 10.5281/zenodo.21745158
+    description: Concept DOI, resolving to the latest version of this record
+
+keywords:
+  - GRACE
+  - GRACE-FO
+  - terrestrial water storage
+  - groundwater depletion
+  - spatial downscaling
+  - temporal disaggregation
+  - Ganga basin
+  - Ganges river basin
+  - machine learning
+  - explainable AI
+  - SHAP
+  - ERA5-Land
+  - uncertainty quantification

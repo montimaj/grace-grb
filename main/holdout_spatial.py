@@ -694,7 +694,7 @@ def create_synthetic_spatial_data(
 def main():
     """Main function for spatial holdout analysis."""
     # Configuration
-    predictor_file = "All_Data.xlsx"
+    predictor_file = "All_Data.csv"
     tws_file = "TWS_JPL.xlsx"
     output_dir = "figures/spatial_holdout"
     

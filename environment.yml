@@ -1,0 +1,66 @@
+# Pinned environment for grace-grb.
+#
+# Pinned, not floating, because gradient-boosting results depend on library
+# versions. This project has already been bitten: lightgbm 4.6 with
+# scikit-learn 1.8 treats an ndarray fitted without feature names differently
+# from earlier pairings. A number reproduced under different libraries is not
+# reproduced.
+#
+# These are the versions every result in the manuscript was produced under. The
+# same list is written into each product's `provenance` block (summary JSON) and
+# into the netCDF global attributes, so a file states its own environment even if
+# separated from this repository.
+#
+#   conda env create -f environment.yml
+#   conda activate grace-grb
+#
+# To relax a pin, change it here and re-run the pipeline: do not mix a new
+# library with old outputs.
+
+name: grace-grb
+
+channels:
+  - conda-forge
+  - nodefaults
+
+dependencies:
+  - python=3.12.9
+
+  # --- numerics and data ---
+  - numpy=2.3.5
+  - pandas=2.3.3
+  - scipy=1.16.3
+  - joblib=1.5.3
+  - dask=2025.12.0
+
+  # --- models ---
+  # scikit-learn supplies RandomForest and the CV splitters; xgboost supplies
+  # both the booster and XGBRFRegressor (the forest-mode ensemble member).
+  - scikit-learn=1.8.0
+  - py-xgboost=3.1.2
+  - lightgbm=4.6.0
+  - pytorch=2.13.0          # basin-scale recurrent models only (legacy path)
+  - optuna=4.9.0
+  - shap=0.50.0
+  - statsmodels=0.14.6
+
+  # --- geospatial ---
+  - gdal=3.12.1
+  - rasterio=1.4.4
+  - rioxarray=0.20.0
+  - geopandas=1.1.2
+  - shapely=2.1.2
+  - pyproj=3.7.2
+  - netcdf4=1.7.4
+
+  # --- figures ---
+  # 600 dpi publication figures; the project's palette lives in main/plot_style.py
+  - matplotlib=3.10.8
+  - seaborn=0.13.2
+
+  # --- io / earth engine ---
+  - earthengine-api=1.7.4
+  - openpyxl=3.1.5          # reads the legacy .xlsx inputs only
+  - rasterstats
+  - h5netcdf
+  - zarr

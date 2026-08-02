@@ -352,7 +352,7 @@ def run_random_holdout_analysis(
 def main():
     """Main function for random holdout analysis."""
     # Configuration
-    predictor_file = "All_Data.xlsx"
+    predictor_file = "All_Data.csv"
     tws_file = "../Data/TWS_GRACE_GEE.csv"
     output_dir = "figures/random_holdout"
     

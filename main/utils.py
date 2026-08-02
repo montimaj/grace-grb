@@ -15,6 +15,7 @@ from plot_style import (
     pretty_model, clean_feature, clean_features, R2, R2_BOLD,
     BAR, BAR_2,
 )
+from gridded_config import read_predictor_table
 
 # Optional SHAP import
 try:
@@ -184,17 +185,18 @@ def load_and_preprocess_data(
     if predictors is None:
         predictors = ['SMS', 'ET', 'rainfall', 'runoff', 'GWSA']
 
-    all_data = pd.read_excel(predictor_file)
+    all_data = read_predictor_table(predictor_file)
 
     # Recover GWSA from runoff rather than losing the tail of the record.
     #
-    # `GWSA` in All_Data.xlsx is exactly `runoff - mean(runoff)` (verified by
+    # `GWSA` in the predictor table is exactly `runoff - mean(runoff)` (verified by
     # linear-identity test, max residual 1.8e-15) -- it contains no groundwater
-    # data despite the name. Its 366 trailing NaNs are an artefact of how that
-    # spreadsheet was assembled, not a limit of the underlying data: `runoff`
-    # (ERA5-Land surface runoff) has complete coverage. Recomputing restores the
-    # whole 2024 tail from real observations, and puts the column's definition
-    # in code instead of baked invisibly into a spreadsheet.
+    # data despite the name. The legacy hand-made spreadsheet carried 366 trailing
+    # NaNs in this column, an artefact of how it was assembled rather than a limit
+    # of the underlying data; `runoff` (ERA5-Land surface runoff) has complete
+    # coverage. A table from build_all_data.py has no such gap, so this is a no-op
+    # there -- it stays because it keeps the column's definition in code rather
+    # than baked invisibly into a file, and still repairs a legacy spreadsheet.
     if 'runoff' in all_data.columns and 'GWSA' in all_data.columns:
         missing = all_data['GWSA'].isna().sum()
         all_data['GWSA'] = all_data['runoff'] - all_data['runoff'].mean()
@@ -548,6 +550,9 @@ def plot_model_comparison(
         values = df[metric].values
         bars = ax.bar(disp_names, values, color=color, alpha=0.8)
         ax.set_title(R2_BOLD if metric == 'R2' else metric, fontsize=12, fontweight='bold')
+        # set_xticks first: relabelling without pinning the locator warns, and
+        # would silently mismatch labels to bars if the locator ever moved.
+        ax.set_xticks(np.arange(len(disp_names)))
         ax.set_xticklabels(disp_names, rotation=45, ha='right')
         ax.grid(True, alpha=0.3, axis='y')
         

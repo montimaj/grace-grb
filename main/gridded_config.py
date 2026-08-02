@@ -94,14 +94,36 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.abspath(os.path.join(_HERE, '..', 'Data'))
 BASIN_SHAPEFILE = os.path.join(DATA_DIR, 'Ganga Basin Shapefile', 'Ganga_basin.shp')
 
+# The basin-scale predictor table. CSV, not .xlsx: the spreadsheet was a hand-made
+# artefact that build_all_data.py now regenerates, so the only reason to keep the
+# Excel format -- byte-comparison against the shipped copy -- disappeared when
+# that copy was deleted. CSV drops the undeclared openpyxl dependency and reads
+# ~40x faster.
+PREDICTOR_TABLE = os.path.join(DATA_DIR, 'All_Data.csv')
+
+
+def read_predictor_table(path: str = None) -> 'pd.DataFrame':
+    """Read the predictor table, accepting either CSV or the legacy .xlsx.
+
+    `Date` comes back as datetime64 from both. read_csv would otherwise hand back
+    strings, and the silent failure mode -- date filtering that compares text and
+    quietly matches nothing -- is worse than a missing column.
+    """
+    import pandas as pd
+
+    path = path or PREDICTOR_TABLE
+    if path.lower().endswith(('.xlsx', '.xls')):
+        return pd.read_excel(path)
+    return pd.read_csv(path, parse_dates=['Date'])
+
 GRIDDED_DIR = os.path.join(DATA_DIR, 'Gridded')
 RAW_TIF_DIR = os.path.join(GRIDDED_DIR, 'raw')
 CUBE_DIR = os.path.join(GRIDDED_DIR, 'cubes')
 
-# Product period. GLDAS V022 CLSM (the actual source of the paper's SMS and ET
-# columns) begins 2003-01-01, which is why those columns are NaN for 2002 in
-# All_Data.xlsx (8005 non-null of 8401 rows). GRACE mascons begin 2002-04 but
-# the predictors do not, so the gridded product starts in 2003.
+# Product period. ERA5-Land runs 1950-present, so every predictor covers the whole
+# window and the product starts at 2000-01-01. The earlier 2003 start was forced by
+# GLDAS V022 CLSM, which begins 2003-01-01 and left SMS and ET NaN through 2002;
+# it was dropped because it assimilates GRACE, and the 2000 start came with it.
 START_DATE = '2000-01-01'
 END_DATE = '2025-12-31'
 
@@ -450,9 +472,11 @@ def vars_for_grid(grid_key: str) -> List[VariableSpec]:
 # GWSA is de-meaned surface runoff. In the basin-mean case the offset was a
 # single scalar, making it perfectly collinear with `runoff` (r = 1.00000) and
 # rendering the SHAP split between the two arbitrary. On the grid the offset is
-# per-pixel, so GWSA becomes a runoff anomaly relative to local climatology,
-# which is non-degenerate and genuinely informative. It is retained under its
-# original name for continuity with the manuscript; the name is a misnomer.
+# per-pixel, so it becomes a runoff anomaly relative to local climatology, which
+# is non-degenerate.
+#
+# On the grid it is a per-pixel runoff anomaly and is a default predictor under
+# the honest name `runoff_anom` -- see PREDICTORS below.
 # Predictors, all from ERA5-Land -- ONE homogeneous source, 1950 to present,
 # with no GRACE assimilation anywhere in its production chain.
 #
@@ -469,18 +493,44 @@ def vars_for_grid(grid_key: str) -> List[VariableSpec]:
 #   et              = total_evaporation_sum, sign-flipped to positive mm/day
 #   ppt             = total_precipitation_sum
 #   runoff_surface  = surface_runoff_sum
-#   gwsa            = runoff_surface minus its per-pixel temporal mean [derived]
-PREDICTORS: List[str] = ['sms', 'et', 'ppt', 'runoff_surface', 'gwsa']
+#
+#   runoff_anom     = runoff_surface minus its per-pixel temporal mean [derived]
+#
+# `runoff_anom` is the field the basin-scale paper called GWSA. Two decisions
+# about it, both made on measurement rather than preference:
+#
+# RENAMED, because it contains no groundwater. It is exactly `runoff_surface`
+# minus that field's own per-pixel long-term mean. Carrying a predictor called
+# GWSA through a paper in a groundwater journal invites precisely the
+# overstatement the reviewers flagged, and the rename costs nothing. The LEGACY
+# basin-scale path still uses the uppercase `GWSA` column and is untouched.
+#
+# KEPT, because it is the only feature-set decision this data can resolve.
+# In `downscale_ablation.py` (3 repeats, grouped CV) removing it costs +0.66 mm,
+# which is 1.9x the repeat-to-repeat spread of 0.35 mm. Every other trim in that
+# ladder -- thin_ante, lean, minimal -- lands INSIDE the spread and is therefore
+# indistinguishable from doing nothing. Dropping the one measurable effect to
+# solve a naming problem that a rename already solves would be the wrong trade.
+#
+# What it buys is a CENTRING effect, not new information: a tree cannot form
+# `runoff - clim_mean` by splitting on one feature at a time, and a per-pixel
+# anomaly lets one global split threshold mean the same thing in every pixel --
+# which is worth something to a model fitted on 19 mascons and applied to 9,538.
+#
+# Its two climatology columns are NOT built: they are degenerate by construction.
+# See `downscale_features.NO_CLIMATOLOGY`.
+PREDICTORS: List[str] = ['sms', 'et', 'ppt', 'runoff_surface', 'runoff_anom']
 
 # Derived on the grid rather than downloaded.
 DERIVED = {
-    'gwsa': dict(
+    'runoff_anom': dict(
         source='runoff_surface',
         method='subtract_pixelwise_temporal_mean',
         units='mm/day',
         long_name='Surface runoff anomaly relative to per-pixel long-term mean',
-        note='Reproduces the paper\'s "GWSA" column definition. Despite the name '
-             'this field contains no groundwater information.',
+        note='The field the basin-scale paper called "GWSA". Renamed because it '
+             'contains no groundwater. Its climatology columns are degenerate '
+             'by construction and are not built.',
     ),
 }
 
@@ -646,51 +696,58 @@ STATIC_VARS: List[StaticSpec] = [
 
 STATIC_BY_NAME: Dict[str, StaticSpec] = {v.name: v for v in STATIC_VARS}
 
-# Covariates offered to the model. Empty by default: each must EARN its place by
-# improving held-out TREND skill in the leave-one-mascon-out test, because with
-# ~19 independent mascons a covariate correlated with the depletion trend can
-# manufacture apparent skill. See `downscale_covariate_gate.py`.
-# Covariates the model actually uses.
+# Covariates the model uses. ALL of them, and no selection step.
 #
-# Resolved at call time by `resolve_active_covariates()`, which PREFERS the
-# survivor list written by `downscale_covariate_gate.py`. Pipeline order is:
-# gate measures held-out skill -> writes covariate_survivors.json -> the model
-# picks it up automatically. No manual promotion step.
+# There used to be a gate (`downscale_covariate_gate.py`): each covariate had to
+# earn its place by improving leave-one-mascon-out skill, on the reasoning that
+# with ~19 independent mascons a covariate correlated with the depletion trend
+# could manufacture apparent skill. It admitted none of the nine, and it was
+# dropped because its criterion does not match what these fields do.
 #
-# Automated but not silent: the gate writes the full comparison table alongside
-# the survivor list, every run logs which covariates were resolved and from
-# where, and the choice is recorded in the product netCDF. Set
-# COVARIATES_OVERRIDE or the GRACE_COVARIATES env var to pin a set and ignore
-# the gate.
-ACTIVE_COVARIATES: List[str] = []
+# The gate scored on ANOMALY R2. Its second criterion, trend R2, could never
+# fire: measured, trend R2 is ~0 for the baseline and for every covariate
+# (5.3e-05 to 2.9e-04), so the OR-clause was inert and selection ran entirely on
+# seasonal-anomaly skill. But the product takes level and trend from GRACE per
+# mascon and the model fits only the ANOMALY -- so irrigated cropland, whose
+# effect is on the depletion TREND, was being judged on a component it was never
+# going to move. Judged that way it scored +0.0009 and was dropped.
+#
+# The leakage worry that motivated the gate is defused by the same decomposition:
+# a covariate correlated with depletion cannot inject a false trend into the
+# product, because the trend does not come from the model.
+#
+# Two of these are ANNUAL, not static, despite the STATIC_VARS container name:
+# `crop_irrigated` and `crop_rainfed` are C3S land cover, one value per year
+# 2000-2022, broadcast month-to-year and held constant after 2022. The other
+# seven are single images. Dropping a time-varying land-use field on a
+# seasonal-anomaly criterion was the clearest symptom that the criterion was
+# wrong.
+#
+# Cost of including all nine: +0.0016 anomaly R2 against baseline -- slightly
+# positive. See Results/downscaling/covariate_gate_joint_sets_xgboost.csv, kept
+# as the record of that measurement.
+ACTIVE_COVARIATES: List[str] = [v.name for v in STATIC_VARS]
 COVARIATES_OVERRIDE: Optional[List[str]] = None
-SURVIVOR_JSON = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '..', 'Results', 'downscaling',
-    'covariate_survivors.json')
 
 
 def resolve_active_covariates(verbose: bool = False) -> List[str]:
     """
     Which covariates the model should use, and where that decision came from.
 
-    Order: explicit override -> GRACE_COVARIATES env var -> gate survivors ->
-    the ACTIVE_COVARIATES literal (empty, i.e. baseline).
+    Order: explicit override -> GRACE_COVARIATES env var -> ACTIVE_COVARIATES.
+
+    No longer consults a survivor file. It used to prefer one written by the
+    gate, which meant a stale `covariate_survivors.json` on disk silently
+    outranked this module -- after the gate was dropped that file would have
+    pinned the model back to the baseline while ACTIVE_COVARIATES said otherwise.
     """
     if COVARIATES_OVERRIDE is not None:
         chosen, src = list(COVARIATES_OVERRIDE), 'COVARIATES_OVERRIDE'
     elif os.environ.get('GRACE_COVARIATES'):
         chosen = [c for c in os.environ['GRACE_COVARIATES'].split(',') if c.strip()]
         src = 'GRACE_COVARIATES env var'
-    elif os.path.exists(SURVIVOR_JSON):
-        try:
-            import json
-            with open(SURVIVOR_JSON) as fh:
-                chosen = list(json.load(fh).get('survivors', []))
-            src = 'covariate_survivors.json (leave-one-mascon-out gate)'
-        except (ValueError, OSError):
-            chosen, src = list(ACTIVE_COVARIATES), 'ACTIVE_COVARIATES (survivor file unreadable)'
     else:
-        chosen, src = list(ACTIVE_COVARIATES), 'ACTIVE_COVARIATES (gate has not run)'
+        chosen, src = list(ACTIVE_COVARIATES), 'ACTIVE_COVARIATES'
 
     known = {v.name for v in STATIC_VARS}
     unknown = [c for c in chosen if c not in known]

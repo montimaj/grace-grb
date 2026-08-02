@@ -213,7 +213,7 @@ def best_vs_rest_rmse_diff(
 # =============================================================================
 
 def run_leakage_diagnostic(
-    predictor_file: str = "../Data/All_Data.xlsx",
+    predictor_file: str = "../Data/All_Data.csv",
     tws_file: str = "../Data/TWS_GRACE_GEE.csv",
     models: Optional[List[str]] = None,
     predictors: Optional[List[str]] = None,

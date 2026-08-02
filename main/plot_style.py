@@ -57,6 +57,12 @@ _MODEL_DISPLAY = {
     "BiLSTM+Attention": "BiLSTM + Attention",
     "bilstm_attention": "BiLSTM + Attention",
     "BiLSTM_Attention": "BiLSTM + Attention",
+    # Gridded candidates. Without these the fallback renders "xgboost rf" and
+    # "mlp", which is not how either is written in the manuscript.
+    "xgboost_rf": "XGBoost Random Forest",
+    "XGBoost_RF": "XGBoost Random Forest",
+    "mlp": "MLP",
+    "MLP": "MLP",
 }
 
 _SCHEME_DISPLAY = {

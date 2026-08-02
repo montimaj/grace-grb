@@ -256,8 +256,6 @@ def plot_monthly_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
-        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
-                 fontsize=8, style='italic', color='0.35')
         
         safe_name = model_name.replace('+', '_').replace(' ', '_')
         plt.savefig(f"{output_dir}/monthly_maps_{data_type.lower()}_{safe_name}.png", 
@@ -345,8 +343,6 @@ def plot_seasonal_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
-        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
-                 fontsize=8, style='italic', color='0.35')
         
         safe_name = model_name.replace('+', '_').replace(' ', '_')
         plt.savefig(f"{output_dir}/seasonal_maps_{data_type.lower()}_{safe_name}.png", 
@@ -432,8 +428,6 @@ def plot_model_comparison_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
-        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
-                 fontsize=8, style='italic', color='0.35')
         
         plt.savefig(f"{output_dir}/model_comparison_{MONTH_NAMES[month-1].lower()}.png", 
                    dpi=600, bbox_inches='tight')
@@ -521,8 +515,6 @@ def plot_seasonal_comparison_maps(
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
         cbar.set_label('TWS Anomaly (mm)', fontsize=12)
-        fig.text(0.5, 0.008, BASIN_SCALE_NOTE, ha='center', va='bottom',
-                 fontsize=8, style='italic', color='0.35')
         
         plt.savefig(f"{output_dir}/model_comparison_{season_short.lower()}.png", 
                    dpi=600, bbox_inches='tight')

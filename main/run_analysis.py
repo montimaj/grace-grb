@@ -49,7 +49,7 @@ def run_analysis(
     if models is None:
         models = ['bilstm_attention', 'bilstm', 'lstm', 'xgboost', 'lightgbm', 'randomforest']
     
-    predictor_file = kwargs.get('predictor_file', 'All_Data.xlsx')
+    predictor_file = kwargs.get('predictor_file', 'All_Data.csv')
     tws_file = kwargs.get('tws_file', '../Data/TWS_GRACE_GEE.csv')
     
     results = {}
@@ -253,7 +253,7 @@ def main():
     parser.add_argument(
         '--predictor-file',
         type=str,
-        default='../Data/All_Data.xlsx',
+        default='../Data/All_Data.csv',
         help='Path to predictor data file'
     )
     

@@ -67,6 +67,7 @@ import pandas as pd
 import gridded_config as cfg
 import downscale_features as F
 import downscale_model as M
+import figure_captions
 
 # ERA5-Land fields used by each route.
 FLUX_IN = 'ppt'
@@ -126,7 +127,7 @@ def daily_shape(method: str, days: pd.DatetimeIndex,
     for _, idx in pd.Series(range(len(days)), index=days).groupby(
             days.to_period('M')):
         sl = idx.to_numpy()
-        with np.errstate(invalid='ignore'):
+        with F.allnan_ok():
             out[sl] = raw[sl] - np.nanmean(raw[sl], axis=0, keepdims=True)
     return out
 
@@ -149,7 +150,7 @@ def check_closure(daily: np.ndarray, days: pd.DatetimeIndex,
     for i in range(len(months)):
         sel = pos == i
         if sel.any():
-            with np.errstate(invalid='ignore'):
+            with F.allnan_ok():
                 agg[i] = np.nanmean(daily[sel], axis=0)
     err = np.abs(agg - monthly)
     ok = np.isfinite(err)
@@ -215,6 +216,8 @@ def write(daily: Dict[str, np.ndarray], days: pd.DatetimeIndex,
             gv.long_name = 'GRACE observed the month this day belongs to'
             gv[:] = grace_observed_daily.astype('i1')
 
+        for _k, _v in M.provenance().items():
+            setattr(ds, f'provenance_{_k}', str(_v))
         ds.title = ('Daily GRACE TWSA, Ganga basin, 0.1 degree: spatially downscaled, temporally disaggregated')
         ds.primary_variable = f'twsa_{primary}'
         ds.method = (
@@ -229,6 +232,88 @@ def write(daily: Dict[str, np.ndarray], days: pd.DatetimeIndex,
             'trained on an interpolation of the monthly product and would only '
             'learn to reproduce that assumption.')
     return path
+
+
+def plot_temporal_closure(daily: Dict[str, np.ndarray], days: pd.DatetimeIndex,
+                    monthly: np.ndarray, months: pd.DatetimeIndex,
+                    cells: np.ndarray, out_dir: str) -> Optional[str]:
+    """
+    The temporal-closure figure: daily re-aggregated to monthly, against the anchor.
+
+    A reviewer asked for exactly this — re-aggregate the predicted daily field
+    back to monthly and compare against GRACE — and asked what result to expect.
+
+    The expected result is EXACT AGREEMENT, and the figure is drawn to show that
+    rather than to imply a test was passed. The within-month shape is de-meaned
+    per pixel per month before it is added to the anchor, so the monthly mean is
+    preserved identically; the monthly product is in turn mass-conserved to
+    observed GRACE at mascon scale. A visible departure here would mean a coding
+    error, not a hydrological finding.
+
+    Drawing it anyway is worthwhile: it is the check a reader would otherwise
+    have to take on trust, and the residual panel makes the magnitude of the
+    floating-point disagreement legible (~1e-4 mm against a signal of ~100 mm).
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from plot_style import DPI, SCI_AQUA, SCI_BLUE, SCI_INK, SCI_MUTED, SCI_ORANGE
+
+    method = 'flux' if 'flux' in daily else next(iter(daily))
+    d = daily[method]
+    pos = pd.Index(months.to_period('M')).get_indexer(days.to_period('M'))
+    agg = np.full_like(monthly, np.nan)
+    for i in range(len(months)):
+        sel = pos == i
+        if sel.any():
+            with F.allnan_ok():
+                agg[i] = np.nanmean(d[sel], axis=0)
+
+    with F.allnan_ok():
+        anchor_series = np.nanmean(monthly, axis=1)
+        agg_series = np.nanmean(agg, axis=1)
+    resid = agg_series - anchor_series
+
+    fig, (ax, ax2) = plt.subplots(2, 1, figsize=(11, 5.4), sharex=True,
+                                  gridspec_kw={'height_ratios': [2.4, 1]})
+    ax.plot(months, anchor_series, '-', color=SCI_BLUE, lw=2.0,
+            label='Monthly product (mass-conserved to GRACE)')
+    ax.plot(months, agg_series, '--', color=SCI_ORANGE, lw=1.6,
+            label=f'Daily field re-aggregated to monthly ({method})')
+    ax.set_ylabel('Basin-mean TWSA (mm)', color=SCI_INK)
+    ax.legend(frameon=False, fontsize=9)
+    ax.set_title('Temporal closure: daily → monthly, against the monthly anchor',
+                 fontweight='bold', color=SCI_INK, loc='left')
+
+    ax2.plot(months, resid, '-', color=SCI_AQUA, lw=1.4)
+    ax2.axhline(0, color=SCI_MUTED, lw=1)
+    ax2.set_ylabel('Residual (mm)', color=SCI_INK)
+    for a in (ax, ax2):
+        a.grid(True, alpha=0.3)
+        for s in ('top', 'right'):
+            a.spines[s].set_visible(False)
+    ax2.set_title(f'max |residual| = {np.nanmax(np.abs(resid)):.2e} mm — '
+                  'floating-point error, not skill',
+                  fontsize=9, color=SCI_MUTED, loc='left')
+
+    fig.tight_layout()
+    p = os.path.join(out_dir, 'Fig_temporal_closure.png')
+    # Caption recorded, not drawn -- see figure_captions. This one matters more
+    # than most: the figure looks like a validation and is not one.
+    figure_captions.record(
+        p,
+        'Not to be confused with the basin-scale temporal closure test of '
+        'temporal_closure_validation.py, which is retired: that one compared a '
+        'model FREE to disagree with GRACE, and could fail. This one cannot. '
+        'Agreement here is EXACT BY CONSTRUCTION: the within-month shape is '
+        'de-meaned per pixel per month, so re-aggregating returns the anchor '
+        'identically. This figure documents that the arithmetic holds; it is '
+        'not evidence that the daily variation is correct, which no available '
+        'observation can establish.')
+    fig.savefig(p, dpi=DPI, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    print(f'   temporal-closure figure: {os.path.basename(p)}')
+    return p
 
 
 def main() -> int:
@@ -262,8 +347,14 @@ def main() -> int:
     monthly = monthly_full.reshape(len(months), -1)[:, cells]
 
     era5_days = F.cube_dates('era5')
+    # Half-open on the NEXT month's first day, not on this month's last day.
+    #
+    # `months[-1] + MonthEnd(1)` lands on 2025-12-31, and `<` then excluded it:
+    # the record lost its final day, and -- worse -- December's monthly mean was
+    # being enforced over 30 days instead of 31, so the closure constraint was
+    # applied to a month the product did not fully contain.
     days = era5_days[(era5_days >= months[0]) &
-                     (era5_days < months[-1] + pd.offsets.MonthEnd(1))]
+                     (era5_days < months[-1] + pd.offsets.MonthBegin(1))]
     print(f'   {len(months)} months -> {len(days)} days, {len(cells):,} cells')
 
     daily: Dict[str, np.ndarray] = {}
@@ -288,9 +379,18 @@ def main() -> int:
         pos = pd.Index(months.to_period('M')).get_indexer(days.to_period('M'))
         obs_daily = obs_flag[pos]
 
+    plot_temporal_closure(daily, days, monthly, months, cells, M.RESULTS_DIR)
+
     out = args.out or os.path.join(M.RESULTS_DIR, 'twsa_0p1deg_daily.nc')
     write(daily, days, cells, out, closure, obs_daily)
+    # M.RESULTS_DIR, not out_dir: this main() has no `out_dir` binding -- the
+    # figure is written to M.RESULTS_DIR directly (see the plot call above), and
+    # `out` is a FILE path, not a directory.
+    caps = figure_captions.write_index(
+        M.RESULTS_DIR, title='Figure captions — daily disaggregation')
     print(f'\nwritten: {out}  ({os.path.getsize(out) / 1e6:.0f} MB)')
+    if caps:
+        print(f'         {caps}')
     return 0
 
 

@@ -359,7 +359,14 @@ def gee_data_download(
         daily_gee_df.to_csv(f'{output_dir}Daily_GEE_GLDAS_{gldas_version}.csv', index=False)
         monthly_grace_df.to_csv(f'{output_dir}Monthly_GRACE.csv', index=False)
     except Exception as e:
+        # Do NOT swallow this. Printing and returning made the process exit 0, so
+        # run_full_pipeline.sh's `require` reported OK on a download that had
+        # written no CSV, and the run continued for 40 minutes before failing at
+        # the first step that opened the file. A transient Earth Engine reset is
+        # exactly the case that must abort the pipeline. The per-day cache in
+        # get_gee_data means a retry resumes, so failing loudly is nearly free.
         print(f"Error {e}")
+        raise
 
 
 if __name__ == "__main__":

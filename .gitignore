@@ -204,7 +204,12 @@ Data/Gridded/
 *.nc
 *.zarr/
 
-# ...but the downscaled products themselves are results worth versioning.
+# ...but the small text evidence under Results/downscaling/ is worth versioning.
+# NOTE: these negations are overridden by the `*.nc` / `*.tif` rules further
+# down (last match wins), so the netCDF PRODUCTS are still ignored. That is
+# deliberate -- the daily product is ~800 MB and belongs in the Zenodo data
+# record, not in git. Verify with:
+#     git check-ignore -v Results/downscaling/twsa_0p1deg_daily.nc
 !Results/downscaling/
 !Results/downscaling/**
 
@@ -217,3 +222,27 @@ TODO.md
 # Claude Code local config (shared settings intentionally not tracked)
 .claude/
 Outputs/
+*.docx
+*.pdf
+*.nc
+*.tif
+# ---------------------------------------------------------------------------
+# Manuscript figures
+# ---------------------------------------------------------------------------
+# The SCRIPTS and the RENDERED FIGURES are tracked: they are the deliverable and
+# they are small. Their third-party inputs are not -- figures/data/ holds ~845 MB
+# of downloaded basemaps (HydroSHEDS 15" DEM, HydroRIVERS, the Survey of India
+# outline, the data.gov.in river network), and `figures/fetch_data.py` re-fetches
+# what it can.
+figures/data/
+
+# Only *.pdf (line 226) actually catches a figure output; the PNG and MD
+# negations are belt-and-braces in case a blanket rule for either is added
+# later. Negations must come AFTER the rule they undo, since last match wins.
+!figures/output/*.pdf
+!figures/output/*.png
+!figures/output/*.md
+cogs/
+*.html
+figures/output/Graphical_Abstract_preview_500x200.png
+

@@ -13,6 +13,8 @@ Supports: BiLSTM+Attention, BiLSTM, LSTM, XGBoost, LightGBM, RandomForest
 """
 
 import random
+import warnings
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -313,18 +315,46 @@ class TreeModelWrapper(BaseModelWrapper):
         
         self.model.fit(X_scaled, y_flat)
         self.is_fitted = True
-        
+
         if verbose:
             print(f"[{self.name}] Training complete.")
-        
+
         return self
+
+    def _has_synthetic_feature_names(self) -> bool:
+        """
+        True if the estimator advertises LightGBM's placeholder column names.
+
+        lightgbm 4.6 exposes `feature_names_in_ = ['Column_0', ...]` even when
+        fit on a plain ndarray, which carries no feature names at all. It is a
+        read-only property derived from the booster, so it cannot be cleared --
+        only recognised.
+        """
+        try:
+            names = self.model.feature_names_in_
+        except Exception:
+            return False
+        return names is not None and all(
+            str(n) == f'Column_{i}' for i, n in enumerate(names))
     
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Make predictions."""
         if not self.is_fitted:
             raise RuntimeError("Model must be fitted before making predictions.")
-        
+
         X_scaled = self.scaler_X.transform(X)
+        # sklearn 1.8 warns when an estimator claims feature names and gets an
+        # unnamed array. Against lightgbm's placeholder names that check is
+        # vacuous -- MinMaxScaler returns an ndarray for both fit and predict,
+        # so there are never names on either side and nothing can mismatch;
+        # column ORDER is what the model indexes by and it is identical. It
+        # fired 219 times in one pipeline run. Suppressed only for placeholder
+        # names, so a model fit on a DataFrame still gets the real check.
+        if self._has_synthetic_feature_names():
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    'ignore', 'X does not have valid feature names', UserWarning)
+                return self.model.predict(X_scaled)
         return self.model.predict(X_scaled)
     
     def get_feature_importance(self, feature_names: List[str]) -> Dict[str, float]:

@@ -52,6 +52,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import warnings
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -81,6 +82,70 @@ MIN_MASCON_AREA_KM2 = 2000.0
 # --------------------------------------------------------------------------
 # Metrics
 # --------------------------------------------------------------------------
+
+def _json_safe(o):
+    """
+    JSON encoder fallback for the numpy types that reach the summary file.
+
+    `conserve_mass` returns `grace_observed` as a per-month boolean ARRAY -- the
+    flag saying which months GRACE actually constrained. json.dump cannot encode
+    an ndarray, so writing the summary raised TypeError *after* the netCDF
+    product had already been written, aborting the pipeline at its last step
+    with every expensive result on disk but the run marked failed.
+
+    Converting rather than dropping keeps the flag in the summary, where it
+    belongs: a reader checking whether a month is model-only should not have to
+    open the netCDF. np.integer is handled too because it is NOT a subclass of
+    int (np.floating is a subclass of float, so it already encodes).
+    """
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    if isinstance(o, np.bool_):
+        return bool(o)
+    if isinstance(o, np.integer):
+        return int(o)
+    if isinstance(o, np.floating):
+        return float(o)
+    raise TypeError(f'Object of type {type(o).__name__} is not JSON serializable')
+
+
+def provenance(seed: Optional[int] = None) -> Dict[str, object]:
+    """
+    Library versions, seed and git commit, recorded into every product.
+
+    A reviewer asked for software versions and random seeds to be reported. They
+    were not: the seed existed only as a default in the source, and no version
+    was captured anywhere -- the install instructions pin nothing.
+
+    That is not bookkeeping here. Gradient-boosting results are version
+    sensitive, and this project has already been bitten once: lightgbm 4.6 with
+    scikit-learn 1.8 emits a spurious feature-name warning that earlier versions
+    do not, because the two libraries disagree about what an ndarray fit implies.
+    A number reproduced without its library versions is not reproduced.
+
+    Failures are swallowed per-package: a missing optional import must never cost
+    a product that has otherwise been computed.
+    """
+    import platform
+    import subprocess
+
+    out: Dict[str, object] = {'python': platform.python_version(), 'seed': seed}
+    for mod in ('numpy', 'pandas', 'scikit-learn', 'xgboost', 'lightgbm',
+                'netCDF4', 'optuna', 'scipy'):
+        try:
+            import importlib.metadata as md
+            out[mod] = md.version(mod)
+        except Exception:  # noqa: BLE001 - absent or unresolvable is itself informative
+            out[mod] = 'not installed'
+    try:
+        out['git_commit'] = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            stderr=subprocess.DEVNULL, text=True).strip()
+    except Exception:  # noqa: BLE001 - not every deployment is a git checkout
+        out['git_commit'] = 'unknown'
+    return out
+
 
 def metrics(y: np.ndarray, p: np.ndarray) -> Dict[str, float]:
     """
@@ -132,7 +197,7 @@ def mascon_neighbours(mascon_id: np.ndarray) -> Dict[int, set]:
 # --------------------------------------------------------------------------
 
 def decompose_target(
-    fs: F.FeatureSet, min_obs: int = 24
+    fs: F.FeatureSet, min_obs: int = 24, fit_mask: Optional[np.ndarray] = None
 ) -> Tuple[np.ndarray, np.ndarray, Dict[int, Tuple[float, float]]]:
     """
     Split each mascon's observed TWSA into (level + linear trend) and anomaly.
@@ -148,6 +213,15 @@ def decompose_target(
     cannot be learned and contaminates the component that can. We instead fit
     only the anomaly, and take level and trend from GRACE itself.
 
+    `fit_mask` restricts which samples the line is FITTED on, while the base is
+    still evaluated everywhere. It exists for the temporal holdouts: fitting on
+    all months and then scoring held-out ones let each test month help build the
+    line that was subtracted from it. Measured on the forward split, that moved
+    the base by 27.5 mm on average and up to 76 mm over the test window, against
+    a leave-one-mascon-out RMSE of ~77 mm -- so it was not a rounding matter.
+    Leave it None for the product and for leave-one-mascon-out, where taking
+    level and trend from the observation is the design rather than a leak.
+
     Returns (base, anomaly, coefficients) aligned with `fs` samples, where
     coefficients maps mascon -> (slope per month, intercept).
     """
@@ -157,6 +231,8 @@ def decompose_target(
 
     for m in np.unique(g):
         seen = (g == m) & np.isfinite(y)
+        if fit_mask is not None:
+            seen &= fit_mask
         if seen.sum() < min_obs:
             continue
         slope, intercept = np.polyfit(t[seen], y[seen], 1)
@@ -224,25 +300,156 @@ def base_field_fine(
 # Models
 # --------------------------------------------------------------------------
 
-def make_model(name: str, seed: int = 42):
+# Hand-set fallbacks, used when no tuned file is present. These were never
+# tuned -- for a long time the project's Optuna search targeted the BASIN-SCALE
+# models instead, which do not build this product. `tune_gridded.py` now tunes
+# these, scored on the same grouped spatial CV the model is judged by, and
+# writes GRIDDED_PARAM_PATH.
+DEFAULT_PARAMS: Dict[str, Dict[str, object]] = {
+    'random_forest': dict(n_estimators=300, min_samples_leaf=5, max_features=0.4),
+    'xgboost': dict(n_estimators=600, learning_rate=0.05, max_depth=8,
+                    subsample=0.8, colsample_bytree=0.6, reg_lambda=1.0),
+    'lightgbm': dict(n_estimators=800, learning_rate=0.05, num_leaves=63,
+                     subsample=0.8, colsample_bytree=0.6),
+    # XGBoost's random-forest mode: one boosting round of `n_estimators`
+    # parallel trees. NOT a third boosting model -- it bags like RandomForest but
+    # with XGBoost's split finding and L2 regularisation, so it sits between the
+    # two families and is worth having as an ensemble member for that reason.
+    #
+    # `learning_rate` is deliberately absent and must stay 1.0: any other value
+    # shrinks the trees and turns it back into (bad) boosting. Column sampling is
+    # PER NODE, the forest convention, not per tree.
+    'xgboost_rf': dict(n_estimators=300, max_depth=12, subsample=0.8,
+                       colsample_bynode=0.8, reg_lambda=1e-5,
+                       min_child_weight=1),
+    # A neural model, so the comparison is not four variations on one idea.
+    #
+    # An MLP and not a recurrent network: nothing here is fed as a sequence.
+    # Temporal memory lives in the FEATURES (antecedent means at 1-24 months,
+    # exponential APIs at tau = 3-120 months, seasonal harmonics), so each row is
+    # an independent (cell, month) vector. An LSTM given these rows would reduce
+    # to an expensive MLP with no sequence to exploit; using one properly would
+    # need per-pixel sequences fitted against ~19 independent spatial units.
+    # The MLP's configuration is not a guess and not a per-run search result:
+    # it is the best of 17 configurations measured under the same grouped CV
+    # the models are ranked by. `mlp_configuration_sweep.py` regenerates the
+    # table; `tune_gridded.FIXED_CONFIG_MODELS` explains why it is fixed.
+    #
+    # WIDTH is flat: 78.92 to 79.19 across 32-256 units, a 0.35% spread over an
+    # 8x range, so width is not what limits this model. DEPTH is not: a second
+    # hidden layer costs 7.2% (best two-layer 84.59 against best one-layer
+    # 78.92), which is why the old (128, 64) default was replaced.
+    #
+    # (128,) is nominally best at 78.92 against 79.04 here. We adopt (64,)
+    # anyway: the 0.15% between them is inside the flat band, and (64,) is the
+    # architecture the learning-rate axis was swept at, so the adopted
+    # configuration sits ON both swept lines rather than at an unmeasured
+    # corner of the grid.
+    #
+    # Learning rate is the axis that matters, and its optimum is INTERIOR to the
+    # swept range (3e-4, between 1e-4 at 79.59 and 1e-3 at 80.52), so the grid
+    # is not merely stopping early. alpha moves the score by 0.01% across four
+    # orders of magnitude, hence a mid value.
+    #
+    # max_iter is a safety cap, not the stopping rule -- early stopping decides,
+    # and fires at ~500-580 epochs here. The old cap of 300 truncated every fit.
+    'mlp': dict(hidden_layer_sizes=(64,), alpha=1e-3,
+                learning_rate_init=3e-4, max_iter=1000, early_stopping=True,
+                n_iter_no_change=12, batch_size=1024),
+}
+
+# Results/tuning/, alongside the basin-scale tuning output, NOT inside
+# Results/downscaling/ -- tuning artefacts are not products.
+GRIDDED_PARAM_PATH = os.path.join(os.path.dirname(RESULTS_DIR), 'tuning',
+                                  'gridded_best_params.json')
+
+
+def load_gridded_params(name: str, path: Optional[str] = None) -> Dict[str, object]:
+    """
+    Tuned hyperparameters for `name`, falling back to DEFAULT_PARAMS.
+
+    Silent fallback is deliberate: a missing tuning file should degrade the run
+    to documented defaults, not abort it. Which set was used is printed by
+    `make_model` and recorded in the product summary, so the fallback is never
+    invisible.
+    """
+    p = path or GRIDDED_PARAM_PATH
+    if not os.path.exists(p):
+        return dict(DEFAULT_PARAMS[name])
+    try:
+        with open(p) as fh:
+            raw = json.load(fh)
+    except (ValueError, OSError):
+        return dict(DEFAULT_PARAMS[name])
+    entry = raw.get(name)
+    if not isinstance(entry, dict):
+        return dict(DEFAULT_PARAMS[name])
+    params = entry.get('best_params', entry)
+    return dict(params) if isinstance(params, dict) else dict(DEFAULT_PARAMS[name])
+
+
+# lightgbm 4.6 sets `feature_names_in_ = ['Column_0', ...]` even when fit on a
+# plain ndarray, and sklearn 1.8 then warns on every predict because the array it
+# gets has no names. In THIS module the check cannot ever be meaningful: the
+# gridded path is ndarray-only on both sides -- `fs.X.to_numpy(dtype='float32')`
+# at fit, `X.to_numpy(dtype='float32')` in predict_fine -- so there are never
+# names to mismatch, and column ORDER (what the model actually indexes by) is
+# identical by construction.
+#
+# `models.py` solves this inside TreeModelWrapper, but nothing here uses that
+# wrapper: make_model returns raw estimators. Hence a filter, scoped to the exact
+# message. If a DataFrame is ever passed to these estimators, this filter would
+# hide a real mismatch -- so that change must revisit this comment.
+warnings.filterwarnings(
+    'ignore', message='X does not have valid feature names',
+    category=UserWarning, module=r'sklearn\..*')
+
+
+def make_model(name: str, seed: int = 20, params: Optional[Dict] = None,
+               tuned_path: Optional[str] = None):
+    if name not in DEFAULT_PARAMS:
+        raise ValueError(f'unknown model {name}')
+    p = dict(params) if params is not None else load_gridded_params(name, tuned_path)
+
     if name == 'random_forest':
         from sklearn.ensemble import RandomForestRegressor
-        return RandomForestRegressor(
-            n_estimators=300, min_samples_leaf=5, max_features=0.4,
-            n_jobs=-1, random_state=seed)
+        return RandomForestRegressor(n_jobs=-1, random_state=seed, **p)
     if name == 'xgboost':
         from xgboost import XGBRegressor
-        return XGBRegressor(
-            n_estimators=600, learning_rate=0.05, max_depth=8,
-            subsample=0.8, colsample_bytree=0.6, reg_lambda=1.0,
-            n_jobs=-1, random_state=seed, tree_method='hist')
-    if name == 'lightgbm':
-        from lightgbm import LGBMRegressor
-        return LGBMRegressor(
-            n_estimators=800, learning_rate=0.05, num_leaves=63,
-            subsample=0.8, colsample_bytree=0.6, n_jobs=-1,
-            random_state=seed, verbose=-1)
-    raise ValueError(f'unknown model {name}')
+        return XGBRegressor(n_jobs=-1, random_state=seed,
+                            tree_method='hist', **p)
+    if name == 'mlp':
+        from sklearn.impute import SimpleImputer
+        from sklearn.neural_network import MLPRegressor
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import StandardScaler
+        # Imputation and scaling are NOT optional here, and are the reason this
+        # is a Pipeline rather than a bare estimator.
+        #
+        # The design matrix carries 44,040 NaNs (4,404 incomplete rows of
+        # 114,504) from the edges of the antecedent and API windows, which the
+        # tree models absorb natively and an MLP cannot. Feature standard
+        # deviations span ~15 orders of magnitude -- climatological means in mm
+        # beside cropland fractions in [0,1] -- so an unscaled network would be
+        # driven entirely by the largest-variance columns.
+        #
+        # Fitting an MLP without these steps and reporting that it lost would be
+        # a rigged comparison, not a result.
+        return Pipeline([
+            ('impute', SimpleImputer(strategy='median')),
+            ('scale', StandardScaler()),
+            ('mlp', MLPRegressor(random_state=seed, **p)),
+        ])
+    if name == 'xgboost_rf':
+        from xgboost import XGBRFRegressor
+        # learning_rate is NOT passed: XGBRFRegressor fixes it at 1.0, which is
+        # what makes it a forest. Guard rather than trust the caller, because a
+        # tuned JSON written by an older search space could carry one.
+        p.pop('learning_rate', None)
+        return XGBRFRegressor(n_jobs=-1, random_state=seed,
+                              tree_method='hist', **p)
+    from lightgbm import LGBMRegressor
+    return LGBMRegressor(n_jobs=-1, random_state=seed, verbose=-1, **p)
 
 
 # --------------------------------------------------------------------------
@@ -256,6 +463,29 @@ class CVResult:
     predictions: np.ndarray          # out-of-fold, aligned with observed samples
     y: np.ndarray
     mascon: np.ndarray
+    cell: np.ndarray                 # flat grid index, for area weighting
+    time_index: np.ndarray           # index into `dates`
+    dates: pd.DatetimeIndex
+
+    def oof_frame(self) -> pd.DataFrame:
+        """
+        Out-of-fold predictions as a tidy table, one row per cell-month.
+
+        Kept because the pooled metrics alone cannot answer anything seasonal.
+        Any question of the form "when in the year is the model wrong, and by how
+        much?" needs the predictions themselves, and it must be these ones: the
+        fitted product reproduces GRACE at basin scale by construction (measured
+        at r = 1.00000, RMSE 0.29 mm), so comparing IT against GRACE would draw
+        two identical curves. Only predictions made for a mascon the model never
+        saw can say anything.
+        """
+        return pd.DataFrame({
+            'date': self.dates.to_numpy()[self.time_index],
+            'mascon': self.mascon,
+            'cell': self.cell,
+            'observed': self.y,
+            'predicted': self.predictions,
+        }).dropna(subset=['predicted'])
 
 
 def leave_one_mascon_out(
@@ -341,7 +571,8 @@ def leave_one_mascon_out(
               **{f'{k}_demeaned': v for k, v in pooled_dm.items()}}
 
     return CVResult(per_fold=per_fold, pooled=pooled, predictions=oof,
-                    y=y, mascon=groups)
+                    y=y, mascon=groups, cell=fs.cell[obs],
+                    time_index=fs.time_index[obs], dates=fs.dates)
 
 
 # --------------------------------------------------------------------------
@@ -598,6 +829,10 @@ def write_product(
             'construction and is not evidence of skill; see the leave-one-mascon-out '
             'holdout and the independent CGWB well comparison.')
         ds.created_by = 'main/downscale_model.py'
+        # Stamp the environment into the product itself, so a file that
+        # outlives its run directory still says what produced it.
+        for k, v in provenance().items():
+            setattr(ds, f'provenance_{k}', str(v))
     return path
 
 
@@ -605,11 +840,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--model', default='random_forest',
-                    choices=['random_forest', 'xgboost', 'lightgbm'])
+                    choices=['random_forest', 'xgboost', 'lightgbm', 'xgboost_rf', 'mlp'])
     ap.add_argument('--no-buffer', action='store_true',
                     help='disable the neighbour buffer (to quantify its effect)')
     ap.add_argument('--skip-product', action='store_true',
                     help='run cross-validation only')
+    ap.add_argument('--n-boot', type=int, default=2000,
+                    help='Cluster-bootstrap resamples for the CIs on pooled '
+                         'skill. Groups are mascons, so this is cheap.')
+    ap.add_argument('--seed', type=int, default=20)
     args = ap.parse_args()
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -633,6 +872,40 @@ def main() -> int:
                     for k, v in cv.pooled.items() if not k.endswith('_demeaned')))
     cv.per_fold.to_csv(os.path.join(RESULTS_DIR, f'lomo_cv_{args.model}.csv'),
                        index=False)
+
+    # The out-of-fold PREDICTIONS, not just their summary. Every seasonal
+    # question -- when in the year the model is wrong, and by how much -- needs
+    # the series rather than the 19 per-mascon rows, and it has to be these
+    # predictions rather than the product's own: the product reproduces GRACE at
+    # basin scale by construction, so scoring it against GRACE draws one curve
+    # twice.
+    oof_path = os.path.join(RESULTS_DIR, f'lomo_oof_{args.model}.csv')
+    oof_df = cv.oof_frame()
+    oof_df.to_csv(oof_path, index=False)
+    print(f'  out-of-fold predictions: {len(oof_df):,} cell-months -> '
+          f'{os.path.basename(oof_path)}')
+
+    # Confidence intervals on the pooled skill, resampling MASCONS rather than
+    # rows. A reviewer asked, correctly, that no metric be reported without one.
+    #
+    # The unit matters more than the machinery: ~83,000 samples come from ~19
+    # independent mascons, so a row-wise bootstrap would count pixels as evidence
+    # and return an interval far too narrow. These will look wide. That width is
+    # the honest consequence of GRACE resolving ~20 numbers over this basin.
+    cv_cis = None
+    try:
+        from stats_utils import cluster_bootstrap_metric_cis, format_ci
+        cv_cis = cluster_bootstrap_metric_cis(
+            cv.y, cv.predictions, cv.mascon, n_boot=args.n_boot, seed=args.seed)
+        fc = format_ci(cv_cis)
+        print('  95% CI (mascon cluster bootstrap, '
+              f'{cv_cis["RMSE"]["n_groups"]} groups, {args.n_boot} resamples):')
+        for k in ('RMSE', 'R2', 'NSE'):
+            print(f'    {k:5s} {fc[k]}')
+        pd.DataFrame(cv_cis).T.rename_axis('metric').to_csv(
+            os.path.join(RESULTS_DIR, f'lomo_cv_ci_{args.model}.csv'))
+    except Exception as err:  # noqa: BLE001 - CIs must never lose a product
+        print(f'  CI computation failed: {err}')
 
     print('\n3b. Temporal holdout (forward block: train early, predict late)')
     # The spatial holdout answers "does this work somewhere it has not seen?".
@@ -671,8 +944,27 @@ def main() -> int:
         return 0
 
     print('\n4. Fitting on all mascons and predicting the anomaly at 0.1 degrees')
+    # A FRESH model on EVERY observed sample. The cross-validation above exists
+    # to estimate skill and its fold models are discarded; the deployed model
+    # uses all the data. Nothing held out in step 3 or 3b reaches this fit.
     model = make_model(args.model)
     model.fit(fs.X.to_numpy(dtype='float32')[obs], anom[obs])
+
+    # Persist it. Refitting is deterministic given the seed and the same cube, so
+    # the product is reproducible without this -- but SHAP, per-pixel
+    # attribution, or applying the model to a new period would otherwise each
+    # require a full refit, and there would be no way to inspect exactly what
+    # produced a shipped product.
+    try:
+        import joblib
+        mp = os.path.join(RESULTS_DIR, f'model_{args.model}.joblib')
+        joblib.dump({'model': model, 'feature_names': list(fs.X.columns),
+                     'model_name': args.model, 'n_train': int(obs.sum()),
+                     'params': load_gridded_params(args.model)}, mp, compress=3)
+        print(f'  fitted on {int(obs.sum()):,} observed samples | saved {os.path.basename(mp)}')
+    except Exception as err:  # noqa: BLE001 - persistence must never lose a product
+        print(f'  fitted on {int(obs.sum()):,} observed samples '
+              f'(model not saved: {err})')
 
     months = fs.dates
     anom_fine, cells = predict_fine(model, months, list(fs.X.columns))
@@ -709,13 +1001,22 @@ def main() -> int:
     for name, b in base.items():
         d = conserved - b
         ok = np.isfinite(d)
+        # Months GRACE never observed are all-NaN rows here; nanstd warns and
+        # returns NaN for them, which nanmean then skips. That is the intended
+        # reading, so the warning is noise -- see F.allnan_ok.
+        with F.allnan_ok():
+            spatial = np.nanmean(np.nanstd(conserved, axis=1) - np.nanstd(b, axis=1))
         print(f'  vs {name:9s}: mean |difference| {np.nanmean(np.abs(d[ok])):7.2f} mm, '
-              f'spatial std added {np.nanmean(np.nanstd(conserved, axis=1) - np.nanstd(b, axis=1)):+7.2f} mm')
+              f'spatial std added {spatial:+7.2f} mm')
 
     with open(os.path.join(RESULTS_DIR, f'summary_{args.model}.json'), 'w') as fh:
-        json.dump({'pooled_cv': cv.pooled, 'conservation': diag,
+        json.dump({'pooled_cv': cv.pooled, 'pooled_cv_ci': cv_cis,
+                   'conservation': diag,
                    'model': args.model, 'n_features': fs.X.shape[1],
-                   'n_mascons': int(len(np.unique(fs.mascon)))}, fh, indent=2)
+                   'n_mascons': int(len(np.unique(fs.mascon))),
+                   'hyperparameters': load_gridded_params(args.model),
+                   'provenance': provenance(args.seed)},
+                  fh, indent=2, default=_json_safe)
     return 0
 
 

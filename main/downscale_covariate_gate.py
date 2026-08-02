@@ -105,16 +105,28 @@ def run(model_name: str = 'xgboost', cumulative: bool = False,
 
     rows = [{'covariate': '(baseline)', **base, 'dR2_anomaly': 0.0, 'dR2_trend': 0.0}]
     kept: List[str] = []
+    # The configuration each trial is scored against. In cumulative mode this is
+    # the last ACCEPTED state, which is not the same as the previous row.
+    #
+    # It was `rows[-1]`, i.e. the previous trial whether or not it was kept. A
+    # rejected covariate is not part of the model, so differencing against it
+    # measures nothing: with zero survivors every trial after the first was
+    # scored against the covariate before it. Measured, `awc` came out at -0.007
+    # (against `wtd`) where the truth against baseline is -0.0029 -- the
+    # single-covariate value. The bug bites precisely when a covariate is
+    # rejected, so it never showed up while survivors were being found.
+    accepted = rows[0]
 
     for name in candidates:
         trial = kept + [name] if cumulative else [name]
         res = evaluate(trial, model_name)
-        ref = rows[-1] if cumulative else rows[0]
+        ref = accepted if cumulative else rows[0]
         d_anom = res['R2_anomaly'] - ref['R2_anomaly']
         d_trend = res['R2_trend'] - ref['R2_trend']
         keep = (d_anom > 0.005) or (d_trend > 0.02)
         if cumulative and keep:
             kept.append(name)
+            accepted = res
         rows.append({'covariate': name, **res,
                      'dR2_anomaly': d_anom, 'dR2_trend': d_trend,
                      'kept': bool(keep)})
@@ -141,7 +153,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--model', default='xgboost',
-                    choices=['random_forest', 'xgboost', 'lightgbm'])
+                    choices=['random_forest', 'xgboost', 'lightgbm', 'xgboost_rf', 'mlp'])
     ap.add_argument('--cumulative', action='store_true',
                     help='greedy forward selection instead of one-at-a-time')
     ap.add_argument('--covariates', nargs='+', default=None)

@@ -166,6 +166,22 @@ def default_cv_rmse(model_name, X, y, n_splits, seed):
 # Persistence
 # =============================================================================
 
+def _delta_pct(entry: dict) -> float:
+    """
+    Percentage change in CV RMSE, tuned minus default. NEGATIVE means less error.
+
+    Reads `delta_rmse_pct` when present and otherwise derives it from the two
+    RMSEs, so a JSON written before the sign convention changed still summarises
+    correctly rather than plotting the old `improvement_pct` upside down.
+    """
+    if "delta_rmse_pct" in entry:
+        return float(entry["delta_rmse_pct"])
+    base, tuned = entry.get("default_cv_rmse"), entry.get("best_cv_rmse")
+    if base:
+        return 100.0 * (tuned - base) / base
+    return float("nan")
+
+
 def save_tuned_params(results: dict, path: str = DEFAULT_PARAM_PATH):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
@@ -215,7 +231,7 @@ def load_training_features(predictor_file, tws_file, predictors=None, lags=7, te
 
 def run_tuning(
     models,
-    predictor_file="../Data/All_Data.xlsx",
+    predictor_file="../Data/All_Data.csv",
     tws_file="../Data/TWS_GRACE_GEE.csv",
     n_trials=60,
     nn_trials=20,
@@ -249,28 +265,36 @@ def run_tuning(
         best_rmse = study.best_value
         n_done = len([t for t in study.trials if t.state.name == "COMPLETE"])
         n_pruned = len([t for t in study.trials if t.state.name == "PRUNED"])
-        improve = 100.0 * (base_rmse - best_rmse) / base_rmse if base_rmse else 0.0
+        # SIGN CONVENTION: tuned MINUS default, so a NEGATIVE number means the
+        # tuning reduced RMSE. Reported this way because the quantity plotted is
+        # an error: "-14.8%" reads directly as "14.8% less error", whereas the
+        # old "improvement" convention inverted the sign of an error change and
+        # made a worse model (RandomForest) show as "-0.1%".
+        delta_rmse = best_rmse - base_rmse
+        delta_pct = 100.0 * delta_rmse / base_rmse if base_rmse else 0.0
 
         results[model_name] = {
             "best_params": best,
             "best_cv_rmse": best_rmse,
             "default_cv_rmse": base_rmse,
-            "improvement_pct": improve,
+            "delta_rmse": delta_rmse,
+            "delta_rmse_pct": delta_pct,
             "n_trials": trials,
             "n_complete": n_done,
             "n_pruned": n_pruned,
             "cv": f"TimeSeriesSplit(n_splits={n_splits})",
         }
         print(f"  default CV RMSE : {base_rmse:.4f}")
-        print(f"  tuned   CV RMSE : {best_rmse:.4f}  ({improve:+.1f}% vs default; "
+        print(f"  tuned   CV RMSE : {best_rmse:.4f}  "
+              f"(delta {delta_rmse:+.4f}, {delta_pct:+.1f}%; negative = less error; "
               f"{n_done} complete, {n_pruned} pruned)")
         print(f"  best params    : {best}\n")
         save_tuned_params(results, out_path)  # checkpoint after each model
 
-    print(f"\n{'='*60}\nTUNING SUMMARY\n{'='*60}")
+    print(f"\n{'='*60}\nTUNING SUMMARY  (delta = tuned - default; negative = less error)\n{'='*60}")
     for m, r in results.items():
         print(f"  {m:18s} RMSE {r['default_cv_rmse']:.3f} -> {r['best_cv_rmse']:.3f} "
-              f"({r['improvement_pct']:+.1f}%)")
+              f"({_delta_pct(r):+.1f}%)")
     return results
 
 
@@ -294,11 +318,13 @@ def summarize_tuning(json_path: str = DEFAULT_PARAM_PATH, output_dir: str | None
     rows = []
     for k in [m for m in order if m in raw] + [m for m in raw if m not in order]:
         v = raw[k]
+        base, tuned = v["default_cv_rmse"], v["best_cv_rmse"]
         rows.append({
             "Model": pretty_model(k),
-            "Default CV RMSE (mm)": round(v["default_cv_rmse"], 3),
-            "Tuned CV RMSE (mm)": round(v["best_cv_rmse"], 3),
-            "Improvement (%)": round(v["improvement_pct"], 1),
+            "Default CV RMSE (mm)": round(base, 3),
+            "Tuned CV RMSE (mm)": round(tuned, 3),
+            "dRMSE (mm)": round(tuned - base, 3),
+            "dRMSE (%)": round(_delta_pct(v), 1),
             "Trials (complete/pruned)": f"{v['n_complete']}/{v['n_pruned']}",
         })
     df = pd.DataFrame(rows)
@@ -313,18 +339,36 @@ def summarize_tuning(json_path: str = DEFAULT_PARAM_PATH, output_dir: str | None
     md_path = os.path.join(output_dir, "tuning_summary.md")
     open(md_path, "w").write("\n".join(md) + "\n")
 
-    # Figure: default vs tuned CV RMSE.
-    fig, ax = plt.subplots(figsize=(1.5 * len(df) + 3, 5))
+    # Two panels. The left keeps the absolute RMSEs, without which a percentage
+    # is unreadable; the right is the quantity actually being claimed --
+    # tuned MINUS default, so bars BELOW zero are the improvements.
     x = np.arange(len(df)); w = 0.38
+    fig, (ax, ax2) = plt.subplots(
+        1, 2, figsize=(2.1 * len(df) + 4, 5), gridspec_kw={'width_ratios': [1.25, 1]})
+
     ax.bar(x - w/2, df["Default CV RMSE (mm)"], w, label="Default", color=BAR_2[0], alpha=0.95)
     ax.bar(x + w/2, df["Tuned CV RMSE (mm)"], w, label="Tuned (Optuna)", color=BAR_2[1], alpha=0.95)
-    for i, (d0, d1) in enumerate(zip(df["Default CV RMSE (mm)"], df["Tuned CV RMSE (mm)"])):
-        ax.text(i + w/2, d1, f"{df['Improvement (%)'][i]:+.1f}%", ha="center", va="bottom", fontsize=8)
     ax.set_xticks(x); ax.set_xticklabels(df["Model"], rotation=30, ha="right")
     ax.set_ylabel("Walk-forward CV RMSE (mm)")
-    ax.set_title("Hyperparameter tuning: default vs Optuna-tuned (walk-forward CV on training data)",
-                 fontweight="bold")
+    ax.set_title("Default vs Optuna-tuned", fontweight="bold")
     ax.legend(); ax.grid(True, alpha=0.3, axis="y")
+
+    d = df["dRMSE (mm)"].to_numpy()
+    # Colour by direction rather than by model: the sign is the message.
+    ax2.bar(x, d, 0.6, color=np.where(d <= 0, BAR_2[1], BAR_2[0]), alpha=0.95)
+    ax2.axhline(0, color="#0b0b0b", lw=1)
+    for i, (dv, dp) in enumerate(zip(d, df["dRMSE (%)"])):
+        ax2.text(i, dv, f"{dp:+.1f}%", ha="center",
+                 va="top" if dv <= 0 else "bottom", fontsize=8)
+    ax2.set_xticks(x); ax2.set_xticklabels(df["Model"], rotation=30, ha="right")
+    ax2.set_ylabel("$\\Delta$RMSE (mm), tuned $-$ default")
+    ax2.set_title("Change in error: below zero = tuning helped", fontweight="bold")
+    ax2.grid(True, alpha=0.3, axis="y")
+    pad = max(np.abs(d).max(), 1e-9) * 0.25
+    ax2.set_ylim(min(d.min(), 0) - pad, max(d.max(), 0) + pad)
+
+    plt.suptitle("Hyperparameter tuning, walk-forward CV on the training split only",
+                 fontweight="bold")
     plt.tight_layout()
     fig_path = os.path.join(output_dir, "tuning_summary.png")
     plt.savefig(fig_path, dpi=DPI); plt.close()
@@ -344,7 +388,7 @@ def main():
     p.add_argument("--splits", type=int, default=4, help="Walk-forward CV folds.")
     p.add_argument("--nn-epochs-max", type=int, default=40, help="Max epochs sampled for NNs.")
     p.add_argument("--seed", type=int, default=20)
-    p.add_argument("--predictor-file", default="../Data/All_Data.xlsx")
+    p.add_argument("--predictor-file", default="../Data/All_Data.csv")
     p.add_argument("--tws-file", default="../Data/TWS_GRACE_GEE.csv")
     p.add_argument("--out", default=DEFAULT_PARAM_PATH)
     p.add_argument("--summarize", action="store_true",

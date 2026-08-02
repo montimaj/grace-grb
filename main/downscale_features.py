@@ -34,7 +34,8 @@ aggregate to the observation.
 
 Feature groups
 --------------
-  dynamic    the five paper predictors (sms, et, ppt, runoff_surface, gwsa),
+  dynamic    the ERA5-Land predictors (sms, et, ppt, runoff_surface) plus the
+             derived runoff_anom,
              monthly means of the daily fields
   antecedent multi-month backward means -- storage carries memory far longer
              than the 7-day window the basin-scale model used, which is the
@@ -52,11 +53,38 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, Tuple
 
+import contextlib
+import warnings
+
 import numpy as np
 import pandas as pd
 
 import gridded_config as cfg
 import downscale_grid_ops as ops
+
+
+@contextlib.contextmanager
+def allnan_ok():
+    """
+    Suppress the all-NaN-slice warnings from nanmean/nanstd, where NaN is right.
+
+    These reductions run over the full lat/lon rectangle, most of which lies
+    OUTSIDE the basin: those pixels are NaN in every month, so `np.nanmean` and
+    `np.nanstd` warn and return NaN -- which is the intended answer, and the
+    caller either masks to `cells` or writes into an array pre-filled with NaN.
+
+    `np.errstate(invalid='ignore')` was already wrapped around these calls but
+    does nothing here: numpy raises these through `warnings.warn` as a
+    RuntimeWarning, not through the floating-point error state. That is why the
+    log still carried 177 'Mean of empty slice' and 25 'Degrees of freedom <= 0'
+    lines. Scoped narrowly so a genuine all-NaN slice in new code still warns.
+    """
+    with warnings.catch_warnings(), np.errstate(invalid='ignore'):
+        warnings.filterwarnings('ignore', r'Mean of empty slice',
+                                RuntimeWarning)
+        warnings.filterwarnings('ignore', r'Degrees of freedom <= 0',
+                                RuntimeWarning)
+        yield
 
 # Raw latitude/longitude are NOT used as predictors.
 #
@@ -182,7 +210,7 @@ def monthly_mean(grid_key: str, var: str, months: pd.DatetimeIndex) -> np.ndarra
             idx = np.flatnonzero(period == m.to_period('M'))
             if idx.size:
                 block = np.asarray(v[idx[0]:idx[-1] + 1])
-                with np.errstate(invalid='ignore'):
+                with allnan_ok():
                     out[i] = np.nanmean(block, axis=0)
     return out
 
@@ -207,7 +235,9 @@ def load_grace_monthly(months: pd.DatetimeIndex) -> np.ndarray:
 # Predictor stack on a target grid
 # --------------------------------------------------------------------------
 
-# Which cube each of the five paper predictors comes from. `gwsa` is derived.
+# Which cube each predictor comes from. `gwsa` is DERIVED rather than read,
+# and is no longer a default -- see gridded_config.PREDICTORS. The derivation
+# below is kept so the ablation can still measure what it would buy.
 # Every predictor now comes from ERA5-Land, on the 0.1 degree product grid, so
 # no predictor is regridded at all. Previously sms/et came from GLDAS 2.2 CLSM,
 # which assimilates GRACE -- the model was partly predicting the target from the
@@ -230,15 +260,18 @@ def predictor_stack(
 
     Fields whose native grid is finer than the target are aggregated with the
     exact area-overlap operator; coarser ones are bilinearly interpolated.
-    `gwsa` is derived on the target grid as surface runoff minus its per-cell
-    long-term mean, reproducing the definition used by the basin-scale paper.
+    `runoff_anom` is derived on the target grid as surface runoff minus its
+    per-cell long-term mean. This is the field the basin-scale paper called
+    `GWSA`; it was renamed because it contains no groundwater and the old name
+    misread badly in a groundwater journal. The legacy basin-scale path still
+    uses the uppercase `GWSA` column and is untouched.
     """
     grids = cfg.build_grids()
     target = grids[target_key]
 
     stack: Dict[str, np.ndarray] = {}
     for name in predictors:
-        if name == 'gwsa':
+        if name == 'runoff_anom':
             continue
         src_key, var = PREDICTOR_SOURCE[name]
         field = monthly_mean(src_key, var, months)
@@ -253,13 +286,29 @@ def predictor_stack(
         else:
             stack[name] = ops.regrid_bilinear(field, src, target)
 
-    if 'gwsa' in predictors:
+    if 'runoff_anom' in predictors:
         runoff = stack['runoff_surface']
-        with np.errstate(invalid='ignore'):
-            stack['gwsa'] = runoff - np.nanmean(runoff, axis=0, keepdims=True)
+        with allnan_ok():
+            stack['runoff_anom'] = runoff - np.nanmean(runoff, axis=0,
+                                                       keepdims=True)
 
     return stack
 
+
+# Fields whose per-pixel climatology is DEGENERATE BY CONSTRUCTION, so the
+# climatology pair is not built for them.
+#
+# `runoff_anom` is `runoff_surface` minus that field's own long-term per-pixel
+# mean, and the climatology block subtracts exactly the same mean -- so
+# `runoff_anom_clim_mean` is identically zero (its only variation is float32
+# rounding, ~1e-5 mm against a field of tens of mm) and `runoff_anom_clim_std`
+# is bit-for-bit `runoff_surface_clim_std`.
+#
+# The constant column is merely dead weight. The DUPLICATE is worse: two
+# identical columns split SHAP credit between them, so the shared feature reads
+# as about half as important as it is -- which would silently corrupt the
+# interpretation the paper reports.
+NO_CLIMATOLOGY = frozenset({'runoff_anom'})
 
 def _context_mean(field: np.ndarray, grid: cfg.Grid, radius_deg: float) -> np.ndarray:
     """Neighbourhood mean of a field, radius expressed in degrees."""
@@ -294,7 +343,7 @@ def _api(field: np.ndarray, tau_months: float) -> np.ndarray:
     # to tau makes the seed an estimate of the equilibrium the filter is heading
     # for, rather than an accident of where the record happens to start.
     warmup = min(max(12, int(round(tau_months))), n_t)
-    with np.errstate(invalid='ignore'):
+    with allnan_ok():
         seed = np.nan_to_num(np.nanmean(flat[:warmup], axis=0), nan=0.0)
     out = np.empty_like(flat)
     prev = seed / max(1.0 - k, 1e-9)
@@ -426,11 +475,12 @@ def build_features(
             for tau in API_TAU_MONTHS:
                 columns[f'{name}_api{tau}m'] = _api(field, tau).reshape(
                     len(months), -1)[:, cells]
-        with np.errstate(invalid='ignore'):
-            clim_mean = np.nanmean(field, axis=0).ravel()[cells]
-            clim_std = np.nanstd(field, axis=0).ravel()[cells]
-        columns[f'{name}_clim_mean'] = np.tile(clim_mean, (len(months), 1))
-        columns[f'{name}_clim_std'] = np.tile(clim_std, (len(months), 1))
+        if name not in NO_CLIMATOLOGY:
+            with allnan_ok():
+                clim_mean = np.nanmean(field, axis=0).ravel()[cells]
+                clim_std = np.nanstd(field, axis=0).ravel()[cells]
+            columns[f'{name}_clim_mean'] = np.tile(clim_mean, (len(months), 1))
+            columns[f'{name}_clim_std'] = np.tile(clim_std, (len(months), 1))
 
 
     for name, field in covariate_stack('grace', months, covariates).items():
@@ -526,11 +576,14 @@ def predict_stack(
             for tau in API_TAU_MONTHS:
                 columns[f'{name}_api{tau}m'] = _api(field, tau).reshape(
                     n_ref, -1)[take][:, cells]
-        with np.errstate(invalid='ignore'):
-            columns[f'{name}_clim_mean'] = np.tile(
-                np.nanmean(field, axis=0).ravel()[cells], (len(months), 1))
-            columns[f'{name}_clim_std'] = np.tile(
-                np.nanstd(field, axis=0).ravel()[cells], (len(months), 1))
+        # Must mirror the training path exactly: a column built here but not
+        # there (or vice versa) is a design-matrix mismatch at prediction time.
+        if name not in NO_CLIMATOLOGY:
+            with allnan_ok():
+                columns[f'{name}_clim_mean'] = np.tile(
+                    np.nanmean(field, axis=0).ravel()[cells], (len(months), 1))
+                columns[f'{name}_clim_std'] = np.tile(
+                    np.nanstd(field, axis=0).ravel()[cells], (len(months), 1))
 
     if WATER_BALANCE_API and {'ppt', 'et', 'runoff_surface'} <= set(stack):
         wb = stack['ppt'] - stack['et'] - stack['runoff_surface']

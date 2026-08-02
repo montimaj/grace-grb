@@ -109,7 +109,9 @@ sweep that has gone stale is announced rather than found later in a figure.
 | `generate_gridded_maps.py` | per-pixel climatology, seasonal, trend, RMS, uncertainty, mascon skill |
 | `validate_wells.py` | downscaled vs bilinear against the wells, in mm |
 | `validate_wells_scales.py` | the same wells at three aggregation scales, plus the residual map |
+| `downscale_annual_cycle.py` | annual cycle scored against **out-of-fold** predictions — the basin mean of the product is GRACE's by construction, so scoring the product against GRACE would measure nothing |
 | `export_cogs.py` | COGs + `geeup` upload script |
+| `make_zenodo_bundles.sh` | assembles the deposit — zips everything except the four product netCDFs, which stay loose. Zenodo caps a record at 100 files and this one holds ~28,000 |
 
 ### Shared
 
@@ -118,6 +120,7 @@ sweep that has gone stale is announced rather than found later in a figure.
 | `utils.py` | data loading, GRACE reader, metrics, SHAP, plotting |
 | `stats_utils.py` | bootstrap CIs (block **and** cluster), significance tests, and the trend layer: Mann-Kendall with Hamed-Rao variance inflation, Sen's slope, seasonal MK, Benjamini-Hochberg |
 | `plot_style.py` | central figure styling — 600 dpi, CVD-safe palette |
+| `figure_captions.py` | caption text held in code rather than burned into the plates, so the journal's caption and the figure cannot disagree |
 | `models.py` | model wrappers used by the **legacy** basin-scale path |
 
 ---

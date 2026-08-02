@@ -1,0 +1,40 @@
+{
+  "model": "xgboost",
+  "target": "mascon_anomaly",
+  "units": "mm",
+  "n_rows_explained": 83309,
+  "n_rows_observed": 83309,
+  "sampled": false,
+  "n_mascons": 19,
+  "n_features": 78,
+  "predictors": "sms,et,ppt,runoff_surface,runoff_anom",
+  "base_value_mm": 0.014446323737502098,
+  "scope": "Attribution is for the mascon-scale TWSA ANOMALY only. Level and trend are taken from GRACE per mascon and never enter the model, so nothing here bears on the depletion trend or on total storage.",
+  "caveat": "TreeSHAP splits credit between correlated columns by how the trees were built, not by any property of the data. Antecedent windows in this matrix correlate up to 0.98, so the ordering of families separated by a few percent is not identifiable.",
+  "shap_seconds_per_row": 0.008934089913964272,
+  "additivity_residual_max_mm": 0.0004527214914560318,
+  "split_half_max_disagreement_pct": {
+    "field": 0.09899868247417842,
+    "term": 0.05540153540666637,
+    "column": 0.032158481281670426
+  },
+  "total_mean_abs_by_partition_mm": {
+    "field": 141.5892085935398,
+    "term": 154.8909393916865,
+    "column": 213.15605680111275
+  },
+  "withdrawn_claim": "WITHDRAWN, quoted not endorsed -- the reviewed basin-scale manuscript reported: \"antecedent SMS is the primary predictor, about 80% of the total explanatory power, providing a mechanistic storage-memory explanation\". That rested on GLDAS 2.2 CLSM soil moisture, which assimilates GRACE, and on a degenerate GWSA column. Both are gone from this design matrix and the figure does not carry over.",
+  "provenance": {
+    "python": "3.12.9",
+    "seed": 20,
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "scikit-learn": "1.8.0",
+    "xgboost": "3.1.2",
+    "lightgbm": "4.6.0",
+    "netCDF4": "1.7.4",
+    "optuna": "4.9.0",
+    "scipy": "1.16.3",
+    "git_commit": "2fb03d63"
+  }
+}

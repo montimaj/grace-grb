@@ -216,6 +216,29 @@ def plot_closure(
     return path
 
 
+def _ci_whiskers(ax, x, lower, upper, color="#0b0b0b", cap=0.18):
+    """
+    Draw CI whiskers at ABSOLUTE positions, not as offsets from the bar height.
+
+    A percentile bootstrap interval is not required to contain the point
+    estimate, and here it sometimes does not: LightGBM's closure R2 is 0.629
+    with a 95% CI of [0.633, 0.851]. Moving-block resampling duplicates blocks,
+    which inflates the correlation R2 is built from, so the resampled
+    distribution sits slightly above the full-sample value. That is a property
+    of the estimator, not a bug -- but matplotlib's `yerr` takes LENGTHS and
+    rejects the resulting negative value, which is what crashed this figure.
+
+    Drawing the interval where it actually lies shows that honestly, instead of
+    clipping the whisker to zero and silently implying the CI ends at the bar.
+    """
+    for xi, lo, hi in zip(x, lower, upper):
+        if not (np.isfinite(lo) and np.isfinite(hi)):
+            continue
+        ax.plot([xi, xi], [lo, hi], color=color, lw=1.2, zorder=3)
+        ax.plot([xi - cap / 2, xi + cap / 2], [lo, lo], color=color, lw=1.2, zorder=3)
+        ax.plot([xi - cap / 2, xi + cap / 2], [hi, hi], color=color, lw=1.2, zorder=3)
+
+
 def plot_closure_metric_summary(
     summary: pd.DataFrame, output_dir: str, prefix: str = "temporal_closure"
 ) -> Optional[str]:
@@ -231,8 +254,8 @@ def plot_closure_metric_summary(
     r2 = summary["R2"].values
     r2_lo = summary["R2_lower"].values
     r2_hi = summary["R2_upper"].values
-    axes[0].bar(x, r2, color=BAR, alpha=0.95,
-                yerr=[r2 - r2_lo, r2_hi - r2], capsize=4, ecolor="#0b0b0b")
+    axes[0].bar(x, r2, color=BAR, alpha=0.95)
+    _ci_whiskers(axes[0], x, r2_lo, r2_hi)
     axes[0].set_xticks(x)
     axes[0].set_xticklabels(labels, rotation=45, ha="right")
     axes[0].set_ylabel(f"Closure {R2}")
@@ -242,8 +265,8 @@ def plot_closure_metric_summary(
     rmse = summary["RMSE"].values
     rmse_lo = summary["RMSE_lower"].values
     rmse_hi = summary["RMSE_upper"].values
-    axes[1].bar(x, rmse, color=BAR, alpha=0.95,
-                yerr=[rmse - rmse_lo, rmse_hi - rmse], capsize=4, ecolor="#0b0b0b")
+    axes[1].bar(x, rmse, color=BAR, alpha=0.95)
+    _ci_whiskers(axes[1], x, rmse_lo, rmse_hi)
     axes[1].set_xticks(x)
     axes[1].set_xticklabels(labels, rotation=45, ha="right")
     axes[1].set_ylabel("Closure RMSE (mm)")
@@ -339,8 +362,10 @@ def run_temporal_closure_validation(
             "Pearson_r": result["pearson_r"], "Pearson_p": result["pearson_p"],
         })
 
+        # format_ci already renders 'point [lo, hi]', so prefixing m.r2 printed
+        # the point estimate twice ("R2=0.444 0.444 [0.437, 0.759]").
         print(f"[{model}] closure over {result['n_months']} months: "
-              f"R2={m.r2:.3f} {format_ci(cis)['R2']}, "
+              f"R2={format_ci(cis)['R2']}, "
               f"RMSE={m.rmse:.2f} mm, r={result['pearson_r']:.3f}, "
               f"PBIAS={m.pbias:.1f}%")
 
