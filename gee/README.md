@@ -17,6 +17,7 @@ reason to prefer or avoid this architecture.
 | monthly | `projects/grace-grb-ml/assets/twsa_0p1deg_monthly_twsa__sigma_total` | 312 | `b1` = `twsa`, `b2` = `sigma_total` |
 | daily | `projects/grace-grb-ml/assets/twsa_0p1deg_daily_twsa_flux__twsa_state__daily_method_spread` | 9,497 | `b1` = `twsa_flux`, `b2` = `twsa_state`, `b3` = `daily_method_spread` |
 | trend | `projects/grace-grb-ml/assets/twsa_0p1deg_trend` | 1 | `b1`…`b9` = `sen_slope`, `ols_slope`, `p_value`, `z_score`, `kendall_tau`, `variance_factor`, `significant`, `significant_fdr`, `tested` |
+| boundary | `projects/grace-grb-ml/assets/grb-boundary` | — | `FeatureCollection`, not imagery — the basin outline drawn over every layer |
 
 The trend is a one-image collection because that is what geeup uploads into; the
 app reads it as `ee.Image(ee.ImageCollection(TREND).first())`. It is written by
@@ -119,18 +120,22 @@ show the difference.
 
 ## Outstanding
 
-- [ ] **Make the three collections public.** Verified 1 Aug: all three are
-      `all_users_can_read: False`. Nothing outside this project can read them, so
-      any app or snippet pointing at them fails for everyone else. Do this only
-      once ingestion is complete — a half-ingested public collection is worse
-      than a private one:
+- [x] ~~Make all four assets public~~ — done, 1 Aug. The app and every snippet
+      below now work for an anonymous visitor.
+
+      `grb-boundary` belongs in this set and is easy to miss, because it is a
+      FeatureCollection rather than imagery: were it left private, the raster
+      layers would render for an anonymous visitor while the basin outline
+      silently did not, which reads as a drawing bug rather than a permissions
+      one. If that symptom ever appears, re-check the ACLs first:
 
           import ee; ee.Initialize(project='grace-grb-ml')
           for a in ('twsa_0p1deg_monthly_twsa__sigma_total',
                     'twsa_0p1deg_daily_twsa_flux__twsa_state__daily_method_spread',
-                    'twsa_0p1deg_trend'):
-              ee.data.setAssetAcl('projects/grace-grb-ml/assets/' + a,
-                                  {'all_users_can_read': True})
+                    'twsa_0p1deg_trend',
+                    'grb-boundary'):
+              print(a, ee.data.getAssetAcl('projects/grace-grb-ml/assets/' + a)
+                        .get('all_users_can_read'))
 
 - [x] ~~Publish and record the App URL~~ — done; recorded here, in the root
       `README.md` and in the Zenodo record description.

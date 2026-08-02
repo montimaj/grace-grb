@@ -5,10 +5,10 @@
 > readership will search for; body text and code use **Ganga**, the official
 > name used by the Central Water Commission and by CGWB, whose wells are the
 > validation set here. The Zenodo record glosses both. The mix is deliberate, and
-> three occurrences must never be "corrected": the `Ganga Basin Shapefile/`
-> path, the `rivname == 'Ganga'` value in the Government of India river network
-> that draws the main channel in Figure 1, and the published Earth Engine asset
-> id `ganga_basin`. Renaming any of those breaks something silently.
+> two occurrences must never be "corrected": the `Ganga Basin Shapefile/` path,
+> and the `rivname == 'Ganga'` value in the Government of India river network
+> that draws the main channel in Figure 1. Renaming either breaks something
+> silently — the first a load, the second the red channel on the plate.
 
 ### 🌍 [Explore the product in your browser](https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer)
 
