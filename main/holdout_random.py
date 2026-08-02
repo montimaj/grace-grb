@@ -1,4 +1,21 @@
 """
+SUPERSEDED FOR DAILY CLAIMS -- see METHODS.md.
+
+This module belongs to the BASIN-SCALE pipeline, which trains on a daily target
+obtained by LINEARLY INTERPOLATING the monthly GRACE series. No independent daily
+observation exists, so a model fitted this way learns partly to reproduce that
+interpolation, and its apparent daily skill measures fit to an assumption. The
+temporal closure test (`temporal_closure_validation.py`) exists precisely because
+daily skill cannot be validated directly from this dataset.
+
+The gridded pipeline takes the opposite route: the ML model is trained ONLY on
+observed monthly GRACE, and daily variation is added afterwards by physical
+disaggregation of ERA5-Land fluxes and states (`downscale_daily.py`), with no
+fitting and no invented target.
+
+Retained because it reproduces the basin-scale manuscript. Not the basis for any
+daily claim.
+
 Random Holdout Analysis for TWS Downscaling
 Performs random train-test split for model evaluation.
 """
@@ -6,21 +23,18 @@ Performs random train-test split for model evaluation.
 import os
 import time
 import numpy as np
-import pandas as pd
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Dict, List, Tuple
 from sklearn.model_selection import train_test_split, KFold
 
 from models import (
-    get_model, get_all_models, set_seed,
-    BiLSTMAttentionWrapper, BiLSTMWrapper, LSTMWrapper,
-    XGBoostWrapper, LightGBMWrapper, RandomForestWrapper
+    get_model, set_seed
 )
 from utils import (
     load_and_preprocess_data, create_lagged_features, prepare_features_target,
     calculate_metrics, plot_predictions, plot_training_loss,
     plot_feature_importance, plot_model_comparison, plot_train_test_comparison,
     save_predictions, save_full_predictions, create_summary_report, 
-    EvaluationMetrics, run_shap_analysis
+    run_shap_analysis
 )
 
 
@@ -29,7 +43,8 @@ def random_holdout_split(
     y: np.ndarray,
     dates: np.ndarray,
     test_size: float = 0.2,
-    seed: int = 20
+    seed: int = 20,
+    groups: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Perform random train-test split.
@@ -52,8 +67,29 @@ def random_holdout_split(
     Tuple containing train/test splits for X, y, and dates
     """
     indices = np.arange(len(X))
-    train_idx, test_idx = train_test_split(indices, test_size=test_size, random_state=seed)
-    
+
+    # Split on GRACE INTERPOLATION SEGMENTS, not on individual days.
+    #
+    # The daily target is a linear interpolation between observed monthly GRACE
+    # values, so two days inside one segment are exact linear blends of the same
+    # two anchors. A plain day-level shuffle therefore leaks almost completely:
+    # the test targets can be reconstructed from the training targets by
+    # interpolation alone, using NO predictors, at R2 = 0.999997 (RMSE 0.28 mm
+    # against a test-target std of 159 mm). The resulting metrics measure
+    # in-sample fit, and the train-vs-test gap billed as an overfitting
+    # diagnostic is structurally forced to ~0.
+    #
+    # Grouping by segment puts every day of an interpolation interval on the same
+    # side of the split, so a test day is never bracketed by training anchors.
+    if groups is not None:
+        from sklearn.model_selection import GroupShuffleSplit
+        splitter = GroupShuffleSplit(n_splits=1, test_size=test_size,
+                                     random_state=seed)
+        train_idx, test_idx = next(splitter.split(indices, groups=np.asarray(groups)))
+    else:
+        train_idx, test_idx = train_test_split(
+            indices, test_size=test_size, random_state=seed)
+
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]
     dates_train, dates_test = dates[train_idx], dates[test_idx]
@@ -316,8 +352,8 @@ def run_random_holdout_analysis(
 def main():
     """Main function for random holdout analysis."""
     # Configuration
-    predictor_file = "All_Data.xlsx"
-    tws_file = "TWS_JPL.xlsx"
+    predictor_file = "All_Data.csv"
+    tws_file = "../Data/TWS_GRACE_GEE.csv"
     output_dir = "figures/random_holdout"
     
     # Check if data files exist

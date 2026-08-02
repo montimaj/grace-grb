@@ -1,2 +1,0 @@
-name,n_total,n_train,n_test,test_fraction,train_start,train_end,test_start,test_end,n_features
-spatial,81893,73703,8190,0.1,2002-04-01,2024-09-01,2002-04-01,2024-09-01,35

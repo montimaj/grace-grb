@@ -1,1107 +1,398 @@
-# Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin
+# `main/` — module reference
 
-A comprehensive framework for downscaling GRACE Terrestrial Water Storage (TWS) data using multiple machine learning models with different holdout validation strategies.
+**Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal
+Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin**
 
-<img src="../Data/Readme_Figs/infographic.png" width=800/>
+![Graphical abstract](../figures/output/Graphical_Abstract.png)
 
-## Table of Contents
+This file documents the **code**. For the scientific method — what is fitted,
+what is constrained, what is validated and what is not — see
+[METHODS.md](../METHODS.md). For products, installation and how to run anything,
+see the [root README](../README.md).
 
-- [Overview](#overview)
-- [Methods](#methods)
-- [Installation](#installation)
-- [Project Structure](#project-structure)
+> **On the two halves of this repository.** The project began as a **basin-scale
+> temporal** analysis: every input reduced to one basin-mean value per time step,
+> six models compared, and the daily field produced by applying a monthly-trained
+> model to daily inputs. That was the initial method, and it is superseded. The
+> method now is the **0.1° spatial downscaling** with a water-balance daily
+> disaggregation, documented here and in METHODS.md.
+>
+> The earlier code is retained, runs only under
+> `./run_full_pipeline.sh --with-legacy`, and is summarised in [Legacy
+> basin-scale code](#legacy-basin-scale-code) at the end. Nothing in the current
+> method reads its output.
+
+---
+
+## Contents
+
+- [Pipeline order](#pipeline-order)
+- [Modules](#modules)
 - [Models](#models)
-- [Holdout Strategies](#holdout-strategies)
-- [SHAP Analysis](#shap-analysis)
-- [Monthly and Seasonal Maps](#monthly-and-seasonal-maps)
-- [Usage](#usage)
-- [API Reference](#api-reference)
-- [Output Files](#output-files)
-- [Evaluation Metrics](#evaluation-metrics)
+- [Validation](#validation)
+- [Uncertainty](#uncertainty)
+- [Evaluation metrics](#evaluation-metrics)
+- [Reproducibility](#reproducibility)
+- [Legacy basin-scale code](#legacy-basin-scale-code)
 
 ---
 
-## Overview
+## Pipeline order
 
-This framework provides a unified interface for training and evaluating multiple machine learning models for TWS downscaling. It supports three types of holdout validation strategies to assess model performance under different conditions:
+`run_full_pipeline.sh` is the single entry point. Two step classes, deliberately
+different: `require` aborts the run on failure (anything later steps depend on),
+`run` logs and continues (leaf steps whose failure cannot corrupt anything
+downstream).
 
-- **Random Holdout**: Standard random train-test split
-- **Temporal Holdout**: Time-based split maintaining chronological order
-- **Spatial Holdout**: Location-based split on *synthetic* replicated data (a noise-sensitivity demonstration, not real spatial generalisation; see [Scope and Limitations](#scope-and-limitations-please-read-before-interpreting-results))
+```
+inputs        build_all_data.py → export_basin_grace.py → wells_ingest.py
+gridded       downscale_ablation.py    (diagnostic; changes nothing)
+              mlp_configuration_sweep.py --check-stale   (free; every run)
+              tune_gridded.py          (tunes the tree candidates, selects the product model)
+              mlp_configuration_sweep.py  (--with-mlp-sweep; AFTER tuning, so its
+                                           tree reference is the tuned tree)
+              downscale_model.py       → 0.1° MONTHLY product   ← deliverable
+              downscale_shap.py        (TreeSHAP, grouped by feature family)
+              downscale_uncertainty.py → per-pixel sigma terms
+              downscale_daily.py       → DAILY product           ← deliverable
+validation    downscale_holdouts.py, generate_gridded_maps.py,
+              validate_wells.py, validate_wells_scales.py
+legacy        (only with --with-legacy)
+```
+
+Flags: `--with-download`, `--check`, `--skip-tuning`, `--skip-ablation`,
+`--trials=N`, `--with-legacy`, `--with-mlp-sweep`.
+
+`--with-mlp-sweep` re-derives the MLP's fixed configuration (~1 h). It is
+opt-in because re-deriving it every run is the cost that fixing the
+configuration exists to avoid. Every run does however check the released
+sweep against the current predictor set — free, reads one CSV column — so a
+sweep that has gone stale is announced rather than found later in a figure.
 
 ---
 
-## Methods
-
-### Study Area and Data
-
-This framework is designed for **basin-scale temporal analysis** of Terrestrial Water Storage (TWS) anomalies. The data represents spatially-averaged time series over the entire study basin (e.g., Ganga Basin), rather than spatially distributed gridded data. Each observation corresponds to a monthly basin-wide average value.
-
-#### Data Sources
-
-1. **GRACE/GRACE-FO TWS Anomalies (Target Variable)**
-   - Source: NASA JPL GRACE/GRACE-FO Mascon Solutions
-   - Temporal Resolution: Monthly
-   - Spatial Representation: Basin-averaged values
-   - Units: millimeters (mm) of equivalent water height
-   - Time Period: 2002–present (with data gaps during satellite transitions)
-
-2. **Predictor Variables (Features)** (downloaded via Google Earth Engine; see `gee_download.py` for the exact collections)
-   - **SMS**: Soil Moisture Storage (mm) : NASA GLDAS (`NASA/GLDAS/...`)
-   - **ET**: Evapotranspiration (mm) : NASA GLDAS
-   - **Rainfall**: Precipitation (mm) : **ERA5-Land** (`ECMWF/ERA5_LAND/DAILY_AGGR`), not GPM/GLDAS
-   - **Runoff**: Surface/subsurface runoff (mm) : **ERA5-Land**, not GLDAS
-   - **GWSA**: Groundwater Storage Anomaly (mm) : derived from CGWB / India-WRIS groundwater records
-   - Temporal Resolution: **Daily** (the predictors are used at native daily resolution; the monthly GRACE target is interpolated to daily, not the other way around)
-   - Spatial Representation: Basin-averaged (spatially integrated) values
-
-   > Note: precipitation and surface runoff come from ERA5-Land (verified: the `rainfall` and `runoff` columns correlate 1.00 with the ERA5 fields), while soil moisture and ET come from GLDAS. The revised manuscript (Table 1) matches this.
-
-### Downscaling Approach
-
-The downscaling framework employs a **data-driven machine learning approach** to establish statistical relationships between predictor variables and GRACE TWS anomalies. The goal is to:
-
-1. **Learn temporal patterns** in water storage dynamics from historical data
-2. **Predict TWS anomalies** during GRACE data gaps or for future periods
-3. **Understand feature contributions** to water storage changes through interpretable ML
-
-#### Feature Engineering
-
-**Lagged Features**: To capture temporal dependencies and hydrological memory effects, lagged versions of predictor variables are created:
-
-$$X_t^{(lag)} = [X_{t}, X_{t-1}, X_{t-2}, \ldots, X_{t-k}]$$
-
-where $k$ is the number of lag steps (code default: `lags=7`, i.e. a 7-day window on the daily predictors). This allows models to learn how antecedent conditions influence current TWS. (The revised manuscript describes this 7-day lag window consistently.)
-
-**Feature scaling**: All features (and the target) are scaled to the range [0, 1] using min-max normalization (`MinMaxScaler`), which is what the code actually applies:
-
-$$\hat{X} = \frac{X - X_{\min}}{X_{\max} - X_{\min}}$$
-
-where $X_{\min}$ and $X_{\max}$ are computed from the training set only to prevent data leakage. (The revised manuscript describes this min-max scaling consistently.)
-
-### Machine Learning Models
-
-The framework implements six ML models spanning different algorithmic families:
-
-#### 1. Recurrent Neural Networks (RNNs)
-
-**LSTM (Long Short-Term Memory)**
-
-LSTMs are designed to capture long-term temporal dependencies through gating mechanisms:
-
-- **Forget gate**: $f_t = \sigma(W_f \cdot[h_{t-1}, x_t] + b_f)$
-- **Input gate**: $i_t = \sigma(W_i \cdot[h_{t-1}, x_t] + b_i)$
-- **Candidate cell state**: $\tilde{C}_t = \tanh(W_C \cdot[h_{t-1}, x_t] + b_C)$
-- **Cell state update**: $C_t = f_t \odot C_{t-1} + i_t \odot \tilde{C}_t$
-- **Output gate**: $o_t = \sigma(W_o \cdot[h_{t-1}, x_t] + b_o)$
-- **Hidden state**: $h_t = o_t \odot \tanh(C_t)$
-
-**BiLSTM (Bidirectional LSTM)**
-
-Processes sequences in both forward and backward directions, concatenating hidden states:
-
-$$\overrightarrow{h_t} = \text{LSTM}_{forward}(x_1, x_2, \ldots, x_t)$$
-
-$$\overleftarrow{h_t} = \text{LSTM}_{backward}(x_T, x_{T-1}, \ldots, x_t)$$
-
-$$h_t = [\overrightarrow{h_t}; \overleftarrow{h_t}]$$
-
-**BiLSTM + Attention**
-
-Adds an attention mechanism to weight the importance of different time steps:
-
-- **Attention scores**: $e_t = v^T \tanh(W_h h_t + b)$
-- **Attention weights**: $\alpha_t = \frac{\exp(e_t)}{\sum_{j=1}^{T} \exp(e_j)}$
-- **Context vector**: $c = \sum_{t=1}^{T} \alpha_t h_t$
-
-The attention mechanism enables the model to focus on the most relevant time steps for prediction.
-
-#### 2. Gradient Boosting Methods
-
-**XGBoost (Extreme Gradient Boosting)**
-
-An ensemble method that builds trees sequentially, optimizing a regularized objective:
-
-$$\mathcal{L} = \sum_{i=1}^{n} l(y_i, \hat{y}_i) + \sum_{k=1}^{K} \Omega(f_k)$$
-
-where $\Omega(f) = \gamma T + \frac{1}{2}\lambda \|w\|^2$ is the regularization term.
-
-**LightGBM (Light Gradient Boosting Machine)**
-
-Uses histogram-based algorithms and leaf-wise tree growth for efficiency. Employs Gradient-based One-Side Sampling (GOSS) and Exclusive Feature Bundling (EFB) for faster training.
-
-#### 3. Ensemble Methods
-
-**Random Forest**
-
-An ensemble of decision trees trained on bootstrap samples with random feature subsets:
-
-$$\hat{y} = \frac{1}{B} \sum_{b=1}^{B} T_b(x)$$
-
-where $B$ is the number of trees and $T_b$ is the $b$-th tree.
-
-### Validation Strategies
-
-Given the temporal nature of the data, proper validation is critical to avoid overfitting and provide realistic performance estimates.
-
-#### 1. Random Holdout
-
-- **Method**: Random 80-20 train-test split
-- **Purpose**: Baseline performance assessment
-- **Limitation**: May lead to data leakage due to temporal autocorrelation
-- **K-Fold CV**: Optional 5-fold cross-validation for robust estimates
-
-#### 2. Temporal Holdout
-
-- **Method**: Chronological split where training data precedes test data
-- **Purpose**: Evaluate model's ability to predict future TWS values
-- **Advantage**: Respects temporal ordering, prevents future information leakage
-- **Time Series CV**: Walk-forward validation with expanding training window
-
-The temporal split ensures:
-$$t_{train} < t_{test} \quad \forall \, t_{train} \in D_{train}, \, t_{test} \in D_{test}$$
-
-#### 3. Grouped Holdout (for Multi-Basin Analysis)
-
-- **Method**: Leave-one-basin-out or grouped K-fold when multiple basins are analyzed
-- **Purpose**: Evaluate generalization to unseen basins
-- **Note**: Requires data from multiple basins with basin identifiers
-
-### Model Interpretability
-
-#### SHAP (SHapley Additive exPlanations)
-
-SHAP values provide theoretically grounded feature attributions based on cooperative game theory:
-
-$$\phi_i = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!(|N|-|S|-1)!}{|N|!} [f(S \cup \{i\}) - f(S)]$$
-
-where $\phi_i$ is the SHAP value for feature $i$, $N$ is the set of all features, and $S$ is a subset of features.
-
-**Interpretation:**
-- **Positive SHAP value**: Feature increases TWS prediction
-- **Negative SHAP value**: Feature decreases TWS prediction
-- **Magnitude**: Importance of feature contribution
-
-**Explainer Types:**
-- **TreeExplainer**: Exact, fast computation for tree-based models (XGBoost, LightGBM, RandomForest)
-- **KernelExplainer**: Model-agnostic approximation for neural networks (LSTM, BiLSTM)
-
-### Evaluation Metrics
-
-Model performance is assessed using multiple complementary metrics:
-
-| Metric | Formula | Interpretation |
-|--------|---------|----------------|
-| **MAE** | $\frac{1}{n}\sum_{i=1}^{n}\|y_i - \hat{y}_i\|$ | Average absolute error (mm) |
-| **RMSE** | $\sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}$ | Root mean squared error (mm) |
-| **R²** | $\left(\dfrac{\sum(y_i-\bar{y})(\hat{y}_i-\bar{\hat{y}})}{\sqrt{\sum(y_i-\bar{y})^2}\,\sqrt{\sum(\hat{y}_i-\bar{\hat{y}})^2}}\right)^2$ | **Squared Pearson correlation**: linear association, insensitive to bias/scale (0–1) |
-| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | Nash-Sutcliffe Efficiency: skill *including* bias |
-| **PBIAS** | $\frac{\sum(\hat{y}_i - y_i)}{\sum y_i} \times 100$ | Percent bias (%) |
-
-> **Note on R² vs NSE.** These are now **distinct** metrics. Earlier code computed
-> R² with `sklearn.metrics.r2_score`, which is algebraically identical to NSE
-> (both equal `1 − SSres/SStot`); the two therefore returned the same number.
-> R² is now the **squared Pearson correlation coefficient** (does the model track
-> the *shape* of the signal?), while NSE (`1 − SSres/SStot`) additionally
-> penalises magnitude/bias (does it get the *level* right?). A high R² with a
-> lower NSE indicates good phase agreement but a systematic bias.
-
-**Performance Benchmarks:**
-- NSE > 0.75: Very good
-- NSE 0.65–0.75: Good
-- NSE 0.50–0.65: Satisfactory
-- NSE < 0.50: Unsatisfactory
-
-### Statistical Rigor, Leakage Diagnostics, and Temporal Closure Validation
-
-Three modules add the inferential and validation layers needed for publication-grade reporting. They run automatically at the end of each holdout analysis and can also be invoked standalone.
-
-**`stats_utils.py`: uncertainty and significance**
-- `block_bootstrap_metric_cis`: 95% confidence intervals for MAE, RMSE, R², NSE, PBIAS via a **moving-block bootstrap** that respects temporal autocorrelation (block length auto-selected from the residual ACF).
-- `diebold_mariano`: Diebold–Mariano test (HLN small-sample correction, Newey–West HAC variance) for **whether two models differ significantly** in accuracy; plus `wilcoxon_abs_error` and `paired_bootstrap_metric_diff`.
-- `model_comparison_matrix` / `rank_models_with_significance`: pairwise significance and a best-model ranking.
-- `blocked_kfold_indices`, `purged_kfold_indices`, `compare_cv_leakage`: **leakage-aware cross-validation** contrasting shuffled, blocked and purged+embargoed schemes.
-- `describe_split`, `repeated_cv`: exact split sizes/date ranges and multi-seed repeated CV.
-
-**`temporal_closure_validation.py`: daily→monthly closure**
-Re-aggregates each model's predicted **daily** TWSA to monthly means and compares against the **original observed monthly GRACE** (`TWS_JPL.xlsx`, observed months only), with bootstrap CIs and figures. This is the appropriate check for daily-scale consistency when the ground truth exists only at monthly resolution.
-
-**`analyze_results.py`: driver**
-Produces all of the above from saved predictions without retraining, plus the leakage diagnostic:
-```bash
-python analyze_results.py --holdout-dir ../Results/figures/temporal_holdout   # CIs + DM significance
-python analyze_results.py --leakage --models randomforest xgboost             # random vs blocked vs purged
-python temporal_closure_validation.py --predictions-dir ../Results/figures/temporal_holdout
-```
-
-### Hyperparameter Tuning (Optuna)
-
-`tune_hyperparameters.py` performs Bayesian hyperparameter optimisation for every model with **Optuna** (TPE sampler + median pruner). The search minimises RMSE over **walk-forward (`TimeSeriesSplit`) cross-validation on the training data only**, so it respects temporal ordering and never touches the held-out test period.
-
-```bash
-# tune the fast tree models (writes ../Results/tuning/best_params.json)
-python tune_hyperparameters.py --models randomforest xgboost lightgbm --trials 60
-
-# tune neural nets (slower; fewer trials, capped epochs, pruning). Merges into the same JSON
-python tune_hyperparameters.py --models lstm bilstm bilstm_attention --nn-trials 20 --nn-epochs-max 30
-
-# then run any holdout using the tuned hyperparameters
-python run_analysis.py --analysis all --compare --tuned-params ../Results/tuning/best_params.json
-```
-
-The JSON records, per model, the best parameters, the tuned-vs-default CV RMSE and the number of completed/pruned trials. The runners accept a `tuned_params` dict (loaded via `load_tuned_params`), so tuning is fully opt-in; without `--tuned-params` the documented library defaults are used.
-
-### Scope and Limitations (please read before interpreting results)
-
-- **Basin-scale, spatially integrated.** All inputs are reduced to one basin-mean value per time step. Results are a *temporal* downscaling of a basin-mean series, **not a per-pixel product**. The maps in `generate_monthly_maps.py` fill the basin polygon with a single value and are labelled as basin-scale summaries (a footnote is drawn on each). Per-pixel skill/RMS maps require gridded GRACE + gridded predictors (future work).
-- **Daily target is interpolated.** GRACE is monthly; the daily target is a linear interpolation of the monthly series (see `utils.load_and_preprocess_data`). There is **no independent daily observation**, so direct daily validation is not possible; daily consistency is assessed via the temporal closure test above.
-- **Spatial holdout is synthetic.** It replicates the single basin series across fabricated locations with noise; train/test share near-identical replicates, so it **leaks by construction** and does not measure spatial transferability. It is retained only as a noise-sensitivity demonstration, with a printed disclaimer and a `SYNTHETIC_DATA_DISCLAIMER.txt` written to its output directory.
-
-### Figure conventions
-
-All figures render at **600 DPI**; labels/legends avoid underscores, R² is shown as a superscript, and model/feature names are human-readable (`plot_style.py`).
-
-### Workflow Summary
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Data Preparation                              │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │ GRACE TWS    │    │ GLDAS        │    │ Merge &      │       │
-│  │ (Target)     │ -> │ Predictors   │ -> │ Preprocess   │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Feature Engineering                           │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │ Create Lag   │    │ Standardize  │    │ Train/Test   │       │
-│  │ Features     │ -> │ Features     │ -> │ Split        │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Model Training & Evaluation                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │ Train        │    │ Predict &    │    │ Calculate    │       │
-│  │ Models       │ -> │ Validate     │ -> │ Metrics      │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Interpretability & Outputs                    │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │ SHAP         │    │ Visualization│    │ Export       │       │
-│  │ Analysis     │ -> │ & Plots      │ -> │ Results      │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Modules
+
+### Data acquisition and preparation
+
+| module | role |
+|---|---|
+| `gridded_config.py` | grids, dataset specs, unit provenance, `PREDICTORS`, `ACTIVE_COVARIATES` |
+| `gee_gridded_download.py` | ERA5-Land / GLDAS / GRACE on their **native** lattices — Earth Engine never resamples on our behalf |
+| `gee_static_download.py` | 7 static + 2 annual covariates on the 0.1° grid |
+| `gee_download.py` | basin-mean predictor download (feeds the legacy table) |
+| `build_cube.py` | netCDF cubes, basin mask, mascon partition, static cube |
+| `export_basin_grace.py` | GRACE target from the gridded cube — **everything depends on this** |
+| `build_all_data.py` | rebuilds `Data/All_Data.csv` from the GEE download, closing a provenance gap |
+| `wells_ingest.py` | CGWB well ingest (Kuruva et al. 2025), the independent validation set |
+
+### The method
+
+| module | role |
+|---|---|
+| `downscale_grid_ops.py` | exact area-overlap regridding, mascon weights, smoothing |
+| `downscale_features.py` | feature construction: antecedents, neighbourhood context, climatology, **API** |
+| `downscale_ablation.py` | does the design matrix earn its size? Diagnostic only |
+| `tune_gridded.py` | Optuna for every tree candidate, then selects the product model on CV |
+| `mlp_configuration_sweep.py` | one-off: settles the MLP's fixed configuration and releases the evidence |
+| `downscale_model.py` | spatial CV, 0.1° monthly product, mass conservation, model persistence |
+| `downscale_shap.py` | TreeSHAP on the fitted model, grouped by feature family. Trees only — it cannot explain the MLP — and it explains the **anomaly**, never the level or trend |
+| `downscale_uncertainty.py` | per-pixel uncertainty ensemble + gap-recovery skill |
+| `downscale_daily.py` | daily **disaggregation** (flux and state routes) |
+
+### Validation and output
+
+| module | role |
+|---|---|
+| `downscale_holdouts.py` | month holdouts: `random` / `blocked` / `forward` |
+| `downscale_covariate_gate.py` | standalone covariate diagnostic; **no longer selects** the feature set |
+| `generate_gridded_maps.py` | per-pixel climatology, seasonal, trend, RMS, uncertainty, mascon skill |
+| `validate_wells.py` | downscaled vs bilinear against the wells, in mm |
+| `validate_wells_scales.py` | the same wells at three aggregation scales, plus the residual map |
+| `downscale_annual_cycle.py` | annual cycle scored against **out-of-fold** predictions — the basin mean of the product is GRACE's by construction, so scoring the product against GRACE would measure nothing |
+| `export_cogs.py` | COGs + `geeup` upload script |
+| `make_zenodo_bundles.sh` | assembles the deposit — zips everything except the four product netCDFs, which stay loose. Zenodo caps a record at 100 files and this one holds ~28,000 |
+
+### Shared
+
+| module | role |
+|---|---|
+| `utils.py` | data loading, GRACE reader, metrics, SHAP, plotting |
+| `stats_utils.py` | bootstrap CIs (block **and** cluster), significance tests, and the trend layer: Mann-Kendall with Hamed-Rao variance inflation, Sen's slope, seasonal MK, Benjamini-Hochberg |
+| `plot_style.py` | central figure styling — 600 dpi, CVD-safe palette |
+| `figure_captions.py` | caption text held in code rather than burned into the plates, so the journal's caption and the figure cannot disagree |
+| `models.py` | model wrappers used by the **legacy** basin-scale path |
 
 ---
-
-## Installation
-
-### Dependencies
-
-Open Linux/Mac terminal or Windows PowerShell and run the following:
-```
-conda create -y -n grace-grb python=3.12
-conda activate grace-grb
-conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap optuna
-```
-
-### Required Data Files
-
-- `All_Data.xlsx`: Predictor variables (SMS, ET, rainfall, runoff, GWSA)
-- `TWS_JPL.xlsx`: GRACE TWS data with Year, Month, and TWS columns
-
-**Note:** All TWS (Terrestrial Water Storage Anomaly) values are in **millimeters (mm)**.
-
-## Project Structure
-
-```
-main/
-├── README.md                 # This documentation
-├── models.py                 # ML model wrapper classes (LSTM, BiLSTM, XGBoost, etc.)
-├── utils.py                  # Utility functions (metrics, plotting, SHAP analysis)
-├── holdout_random.py         # Random holdout analysis
-├── holdout_temporal.py       # Temporal holdout analysis
-├── holdout_spatial.py        # Spatial/grouped holdout analysis
-├── run_analysis.py           # Main CLI entry point
-├── generate_monthly_maps.py  # Monthly/seasonal TWS map and time series generation
-├── gee_download.py           # Google Earth Engine data download
-├── stats_utils.py            # Bootstrap CIs, DM/Wilcoxon significance, leakage-aware CV, split reports
-├── temporal_closure_validation.py  # Daily→monthly temporal closure test vs original monthly GRACE
-├── analyze_results.py        # Post-hoc CIs + model-comparison significance + leakage diagnostic
-├── tune_hyperparameters.py   # Optuna hyperparameter tuning (walk-forward CV on training data)
-├── plot_style.py             # Central figure styling (600 DPI, clean labels, R² superscript)
-├── Data/
-│   ├── All_Data.xlsx         # Input features (ERA5-Land + GLDAS variables)
-│   ├── TWS_JPL.xlsx          # Target variable (GRACE TWS)
-│   └── Ganga Basin Shapefile/
-│       └── Ganga_basin.shp   # Basin boundary for visualization
-└── ../Results/figures/       # Generated outputs
-    ├── temporal_holdout/     # Temporal holdout results
-    │   ├── *_predictions_*.csv           # Model predictions
-    │   ├── *_full_predictions_*.csv      # Train+test predictions
-    │   ├── *_shap_*.png                  # SHAP analysis plots
-    │   └── *.png                         # Performance plots
-    ├── random_holdout/       # Random holdout results
-    ├── spatial_holdout/      # Spatial holdout results
-    └── monthly_seasonal_maps/# Monthly/seasonal TWS maps
-        ├── monthly_maps_*.png            # 12-panel monthly maps
-        ├── seasonal_maps_*.png           # 4-panel seasonal maps
-        ├── model_comparison_*.png        # Multi-model comparisons
-        ├── *_time_series_*.png           # Time series with std dev
-        └── *_averages_all_models.csv     # Summary statistics
-```
 
 ## Models
 
-### 1. BiLSTM + Attention (`bilstm_attention`)
-
-Bidirectional LSTM with attention mechanism for capturing temporal dependencies in both directions with learned feature weighting.
-
-**Architecture:**
-- Bidirectional LSTM layer (hidden_size × 2)
-- Attention layer with softmax weighting
-- Fully connected output layer
-
-**Parameters:**
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `hidden_size` | 64 | LSTM hidden dimension |
-| `learning_rate` | 0.001 | Adam optimizer learning rate |
-| `epochs` | 30 | Training epochs |
-| `batch_size` | 64 | Mini-batch size |
-| `seq_length` | 7 | Sequence length (lag periods) |
-
-### 2. BiLSTM (`bilstm`)
-
-Bidirectional LSTM without attention, using the final hidden state for prediction.
-
-**Architecture:**
-- Bidirectional LSTM layer
-- Fully connected output layer
-
-### 3. LSTM (`lstm`)
-
-Standard unidirectional LSTM for sequential modeling.
-
-**Architecture:**
-- LSTM layer
-- Fully connected output layer
-
-### 4. XGBoost (`xgboost`)
-
-Gradient boosted decision trees using the XGBoost library.
-
-**Parameters:**
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `n_estimators` | 100 | Number of boosting rounds |
-| `max_depth` | 6 | Maximum tree depth |
-| `learning_rate` | 0.1 | Boosting learning rate |
-
-### 5. LightGBM (`lightgbm`)
-
-Gradient boosting framework using histogram-based learning.
-
-**Parameters:**
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `n_estimators` | 100 | Number of boosting rounds |
-| `max_depth` | -1 | Maximum tree depth (-1 = no limit) |
-| `learning_rate` | 0.1 | Boosting learning rate |
-| `num_leaves` | 31 | Maximum leaves per tree |
-
-### 6. Random Forest (`randomforest`)
-
-Ensemble of decision trees with bagging.
-
-**Parameters:**
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `n_estimators` | 100 | Number of trees |
-| `max_depth` | None | Maximum tree depth |
-| `min_samples_split` | 2 | Minimum samples for split |
-| `min_samples_leaf` | 1 | Minimum samples per leaf |
-
-## Holdout Strategies
-
-### Random Holdout
-
-Randomly splits temporal data into training and test sets without considering chronological order.
-
-**Use Case:** Baseline model performance assessment
-
-**Features:**
-- Random 80-20 train-test split
-- Optional K-Fold cross-validation for robust estimates
-- Shuffled data distribution
-
-**Note:** While useful for baseline comparisons, random holdout may overestimate performance due to temporal autocorrelation in hydrological data.
-
-```python
-from holdout_random import run_random_holdout_analysis
-
-results = run_random_holdout_analysis(
-    predictor_file="All_Data.xlsx",
-    tws_file="TWS_JPL.xlsx",
-    test_size=0.2,
-    seed=20
-)
-```
-
-### Temporal Holdout
-
-Splits data chronologically, training on earlier data and testing on later data. This is the **recommended validation strategy** for basin-scale temporal TWS data.
-
-**Use Case:** Assessing model performance for future TWS predictions
-
-**Features:**
-- Chronological train-test split (prevents data leakage)
-- Year-based splitting option
-- Time Series Cross-Validation (walk-forward validation)
-- Maintains temporal ordering of hydrological processes
-
-```python
-from holdout_temporal import run_temporal_holdout_analysis
-
-# Option 1: Proportion-based split
-results = run_temporal_holdout_analysis(
-    predictor_file="All_Data.xlsx",
-    tws_file="TWS_JPL.xlsx",
-    test_size=0.2,  # Last 20% for testing
-    run_cv=True
-)
-
-# Option 2: Year-based split
-results = run_temporal_holdout_analysis(
-    predictor_file="All_Data.xlsx",
-    tws_file="TWS_JPL.xlsx",
-    train_end_year=2020,  # Train up to 2020, test on 2021+
-)
-```
-
-### Grouped Holdout (Multi-Basin Analysis)
-
-**Note:** This holdout strategy is designed for studies involving **multiple basins or sub-basins**. For single-basin temporal analysis, use Random or Temporal holdout instead.
-
-Splits data by basin/region identifier to evaluate model generalization to unseen locations.
-
-**Use Case:** Assessing model transferability across different basins
-
-**Features:**
-- Leave-one-basin-out cross-validation
-- Group K-Fold cross-validation
-- Requires basin/region identifier column
-
-```python
-from holdout_spatial import run_spatial_holdout_analysis
-
-# For multi-basin studies with basin identifier
-results = run_spatial_holdout_analysis(
-    data_file="multi_basin_data.csv",
-    group_col='basin_id',  # Column containing basin identifiers
-    n_spatial_groups=5,
-    run_cv=True
-)
-```
-
-#### Single-Basin Synthetic Spatial Mode
-
-When working with a **single basin** (like the Ganga Basin) without spatially-distributed data, the spatial holdout module provides a **synthetic spatial data generation** capability for demonstration and testing purposes.
-
-**How it works:**
-
-1. **Location Generation**: Creates `n_locations` synthetic point locations randomly distributed within the basin boundary (defined by lat/lon ranges)
-
-2. **Data Replication**: The original temporal time series is replicated for each synthetic location
-
-3. **Spatial Noise Addition**: To simulate spatial variability, Gaussian noise is added to TWS values proportional to distance from basin center:
-   
-   $$\text{TWS}_{loc} = \text{TWS}_{original} + \mathcal{N}(0, \sigma_{dist})$$
-   
-   where $\sigma_{dist} = 0.1 \times \sqrt{(lat - lat_c)^2 + (lon - lon_c)^2}$
-
-4. **Spatial Grouping**: Locations are grouped using K-means clustering on coordinates
-
-5. **Leave-One-Group-Out CV**: Models are trained on all groups except one, tested on the held-out group
-
-**Important Caveats:**
-- This is for **demonstration/testing only** - not for actual spatial generalization assessment
-- The synthetic locations don't represent real spatial heterogeneity
-- Results should be interpreted as sensitivity to added noise, not true spatial transferability
-- For real spatial analysis, use actual multi-location or gridded data
-
-```python
-from holdout_spatial import create_synthetic_spatial_data, run_spatial_holdout_analysis
-
-# Step 1: Create synthetic spatial data (for demonstration)
-create_synthetic_spatial_data(
-    predictor_file="All_Data.xlsx",
-    tws_file="TWS_JPL.xlsx",
-    output_file="spatial_data_synthetic.csv",
-    n_locations=10,                    # Number of synthetic locations
-    lat_range=(22.0, 32.0),            # Ganga Basin latitude range
-    lon_range=(73.0, 90.0),            # Ganga Basin longitude range
-    seed=20
-)
-
-# Step 2: Run spatial holdout on synthetic data
-results = run_spatial_holdout_analysis(
-    data_file="spatial_data_synthetic.csv",
-    lat_col='lat',
-    lon_col='lon',
-    n_spatial_groups=5,
-    grouping_method='kmeans',
-    run_cv=True
-)
-```
-
-## SHAP Analysis
-
-SHAP (SHapley Additive exPlanations) analysis is integrated into all holdout strategies to provide model interpretability and feature importance insights.
-
-### Features
-
-- **Summary Plot (Beeswarm)**: Shows feature importance and impact direction
-- **Bar Plot**: Mean absolute SHAP values for feature ranking
-- **Dependence Plots**: Feature value vs SHAP value relationships
-- **Waterfall Plot**: Explanation for individual predictions
-
-### Supported Model Types
-
-| Model Type | SHAP Explainer | Notes |
-|------------|----------------|-------|
-| XGBoost, LightGBM, RandomForest | TreeExplainer | Fast, exact computation |
-| LSTM, BiLSTM, BiLSTM+Attention | KernelExplainer | Slower, model-agnostic |
-
-### Usage
-
-SHAP analysis is enabled by default. To disable:
-
-```python
-# Disable SHAP analysis
-results = run_random_holdout_analysis(
-    predictor_file="All_Data.xlsx",
-    tws_file="TWS_JPL.xlsx",
-    run_shap=False  # Disable SHAP
-)
-
-# Customize SHAP sample size (for large datasets)
-results = run_temporal_holdout_analysis(
-    predictor_file="All_Data.xlsx",
-    tws_file="TWS_JPL.xlsx",
-    run_shap=True,
-    shap_max_samples=300  # Reduce samples for faster computation
-)
-```
-
-### Standalone SHAP Analysis
-
-```python
-from utils import run_shap_analysis, compute_shap_values
-
-# Run complete SHAP analysis with all plots
-shap_result = run_shap_analysis(
-    model=trained_model,
-    X_train=X_train,
-    X_test=X_test,
-    feature_names=feature_names,
-    model_name="XGBoost",
-    output_dir="figures/shap",
-    prefix="random"
-)
-
-# Or compute SHAP values only
-shap_result = compute_shap_values(
-    model=trained_model,
-    X_train=X_train,
-    X_test=X_test,
-    feature_names=feature_names,
-    model_type='tree',  # 'tree', 'neural', or 'auto'
-    max_samples=500
-)
-```
-
-### Output Files
-
-SHAP analysis generates the following files for each model:
-
-| File | Description |
-|------|-------------|
-| `{prefix}_shap_summary_{model}.png` | Beeswarm summary plot |
-| `{prefix}_shap_bar_{model}.png` | Feature importance bar plot |
-| `{prefix}_shap_dependence_{model}.png` | Dependence plots for top features |
-| `{prefix}_shap_waterfall_{model}.png` | Waterfall plot for sample prediction |
-| `{prefix}_shap_importance_{model}.csv` | SHAP importance values (CSV) |
+Five candidates, selectable with `--model` on `downscale_model.py` and
+`downscale_holdouts.py` (`tune_gridded.py` takes `--models`/`--all`):
+
+| name | what it is |
+|---|---|
+| `random_forest` | sklearn RandomForest |
+| `xgboost` | gradient boosting |
+| `lightgbm` | gradient boosting, leaf-wise |
+| `xgboost_rf` | XGBoost's random-forest mode. Bags like RandomForest but with XGBoost's split finding and L2 regularisation. `learning_rate` is **fixed at 1.0** by definition — `make_model` strips any other value — and column sampling is per *node* |
+| `mlp` | a neural model, as a pipeline of median imputation → standardisation → MLP. Both steps are required: the design matrix carries 44,040 NaNs across 4,404 rows, and feature standard deviations span ~15 orders of magnitude. **Fixed configuration** — see below |
+
+**Why an MLP and not an LSTM or CNN** — see [METHODS.md](../METHODS.md) §6.
+Briefly: temporal memory lives in the *features*, so no sequence exists for a
+recurrent network to consume; and a CNN cannot be trained here because no
+fine-scale observation of TWSA exists to supply the coarse→fine pairs that
+super-resolution needs.
+
+`make_model(name, seed=20, params=None)` reads tuned hyperparameters from
+`Results/tuning/gridded_best_params.json`, falling back to documented defaults
+when absent — so the pipeline runs without a tuning step, and which set was used
+is printed rather than silent.
+
+### Which model builds the product
+
+Not a hardcoded choice. `tune_gridded.py --all` tunes the four tree models,
+scores the fixed-configuration MLP on the same folds, ranks all five on that
+mascon-grouped CV, and writes the winner to
+`Results/tuning/selected_model.txt`; `run_full_pipeline.sh` reads that file and
+passes it to `downscale_model.py`, `downscale_holdouts.py` and
+`generate_gridded_maps.py`. With no selection file — a fresh checkout, or
+`--skip-tuning` — it falls back to `xgboost` and says so.
+
+Each model is ranked on its **adopted** configuration: tuned where tuning beat
+the hand-set defaults on those folds, defaults where it did not, so no model is
+credited with a search that made it worse.
+
+Tuning all five is not only about picking a winner. The uncertainty ensemble is
+four of these models, and `sigma_within` is meant to measure disagreement between
+model *families*; tuning one member and leaving three on hand-set defaults would
+fold a tuned-vs-untuned artefact into that term. Ensemble members read the same
+JSON through `make_model`, so tuning them all makes the comparison symmetric.
+
+### The MLP is fixed, not searched
+
+The four tree models are tuned on every run. The MLP is scored and ranked with
+them but its configuration is fixed, set once by `mlp_configuration_sweep.py`
+and released as `Results/tuning/mlp_configuration_sweep.csv` plus
+`Results/figures/Fig_mlp_configuration_sweep.png`.
+
+That is a stronger disclosure than a per-run search, not a weaker one. The
+neural model loses, and the standing objection to such a result is that the
+network was never configured fairly; fifteen TPE trials would show a reader the
+winner and nothing else, while the sweep shows the whole response surface.
+
+Over 21 configurations it establishes that **width is flat** (so the small
+adopted network is the MLP's best case rather than a handicap) while **depth
+hurts** (which is why the old two-layer default was dropped), that the
+learning-rate optimum is *interior* to the swept range rather than sitting on a
+boundary, and that `alpha` is irrelevant across four orders of magnitude. The
+best MLP still trails XGBoost.
+
+The numeric values are omitted here on purpose: the sweep was run on an
+80-feature matrix, before `runoff_anom`'s two degenerate climatology columns
+stopped being built — nothing was dropped from the predictor list — and must be
+re-run on the current 78-feature build. The CSV now
+records `n_features` and the predictor list on every row so a sweep can always
+be matched to the design matrix it measured.
+
+Width and depth are reported separately because one "capacity" number averages a
+flat axis with a steep one and is true of neither.
+
+Re-searching it every run would cost ~16x a single scored fit and cannot close
+a gap several times larger than any tuning gain measured here. `--search-fixed`
+overrides if you want the search anyway.
+
+**The sweep runs after tuning.** Its tree reference uses each tree's *adopted*
+configuration, read from the tuning JSON, so the comparison is the MLP's best of
+21 configurations against the trees at theirs. Run before tuning it falls back to
+hand-set tree defaults — a valid comparison but a weaker one, which would flatter
+the network on a technicality; the CSV records which of the two happened. The
+cheap `--check-stale` still runs early, because a sweep measured on a different
+predictor set is worth knowing about before an hour of tuning rather than after.
+
+**Cost.** Tuning is the expensive step, and three things bound it.
+
+An unpruned search is `models x trials x folds` refits plus one baseline pass per
+model — 80 fits per model at the default 15 trials and 5 folds. **Fold-level
+pruning cuts that**: a trial that is clearly losing is abandoned after three
+folds rather than five, so the real count is lower and varies by how quickly the
+search finds a good region. The number of pruned trials is printed per model.
+
+**The MLP no longer contributes to this at all.** It is scored once at its fixed
+configuration — 5 fits, not 80 — which is most of the reason the whole step got
+cheaper. It used to dominate, at ~100 s per fit against tens of seconds for the
+tree models.
+
+Search ranges were also narrowed using where the optima actually landed on the
+first full run: every `n_estimators` ceiling came down (lightgbm 1600 → 600,
+xgboost 1200 → 700, xgboost_rf 800 → 400), and `xgboost_rf`'s `max_depth` ceiling
+20 → 14 because cost there goes as `n_estimators x 2^depth` and that model alone
+ran over an hour. Two ranges were *widened* rather than narrowed, because their
+optima sat on a boundary: xgboost's `max_depth` and lightgbm's `num_leaves`.
+Cutting a dimension whose optimum is on the edge would be cutting toward the
+answer instead of away from waste.
+
+`--trials=N` lowers the budget further; `--skip-tuning` reuses whatever is in
+the JSON.
+
+Two caveats, both printed at selection time:
+
+- The ranking uses the same CV the tuning optimised, so the winner's absolute
+  score is optimistic. The **ranking** is the usable output; absolute skill comes
+  from the independent leave-one-mascon-out run, which selection never touches.
+- The spread across models is usually small, and it is judged against a
+  **measured** yardstick rather than a threshold picked in advance: each model's
+  own fold-to-fold standard deviation on the same folds. If the candidates differ
+  by less than a single model differs from itself across folds, the selector says
+  the ranking is not resolvable. The old fixed 2% rule survives only as a
+  fallback for tuning files written before `fold_sd` was recorded.
 
 ---
 
-## Monthly and Seasonal Maps
+## Validation
 
-The `generate_monthly_maps.py` script creates spatial visualizations and time series plots of TWS predictions over the study basin, enabling analysis of temporal patterns in water storage.
+Two axes, measured separately because they are different claims.
 
-### Overview
+**Spatial** — `downscale_model.leave_one_mascon_out`. Folds are real 3° mascons,
+and each fold *also* removes its spatial neighbours, because JPL's CRI filtering
+correlates adjacent mascons and a neighbour left in training is a partial answer
+key. With 19 in-basin mascons a fold trains on roughly 12–13.
 
-This module generates:
-- **Monthly Maps**: Basin-averaged TWS for each calendar month (Jan–Dec)
-- **Seasonal Maps**: Aggregated TWS by hydrological season
-- **Model Comparison**: Side-by-side visualization across all trained models
-- **Actual vs Predicted**: Comparison of observed GRACE TWS with model predictions
-- **Time Series Plots**: Monthly and seasonal bar/line charts with standard deviation
+**Temporal** — `downscale_holdouts.py`, holding out whole **months** (never
+individual pixels: every pixel of a month shares that month's GRACE constraint):
 
-### Season Definitions
+| scheme | months held out | reading |
+|---|---|---|
+| `random` | drawn at random | **optimistic — do not quote as skill** |
+| `blocked` | contiguous, interior | honest: interior gap-filling |
+| `forward` | the last ones | honest: out-of-record extrapolation |
 
-The framework uses the following season definitions for the Indian subcontinent:
+The random split is reported *because* the gap between it and `forward` measures
+the autocorrelation optimism rather than asserting it.
 
-| Season | Months | Description |
-|--------|--------|-------------|
-| Pre-Monsoon | April–June | Warming period before monsoon onset |
-| Monsoon | July–September | Southwest monsoon (peak precipitation) |
-| Post-Monsoon | October–November | Monsoon withdrawal period |
-| Winter | December–March | Dry season with minimal precipitation |
+Each split refits the per-mascon level+trend background on its **training months
+alone**. Fitting it once on the whole record first let held-out months help build
+the background subtracted from them before scoring; on `forward` that was worth
+13.9 mm RMSE (77.2 → 91.1 mm). The old numbers survive as `*_leaky` columns.
 
-### Features
-
-- **Diverging Colormap**: Uses RdYlBu colormap centered at zero to distinguish positive (surplus) and negative (deficit) TWS anomalies
-- **Top-Positioned Colorbar**: Colorbar placed at top of maps for better readability
-- **Consistent Color Scales**: Unified color scale across models for fair comparison
-- **Basin Boundary Overlay**: Shapefile-based visualization of the study basin
-- **Statistical Annotations**: Mean, standard deviation, and sample count for each period
-- **Standard Deviation Visualization**: Error bars and shaded regions showing prediction uncertainty
-
-### Time Series Plots
-
-The module generates several time series visualizations with standard deviation information:
-
-#### Monthly Time Series (`monthly_time_series_all_months.png`)
-- 4×3 grid showing all 12 months
-- Bar charts comparing Actual vs Predicted TWS for each model
-- Error bars representing ±1 standard deviation across years
-
-#### Seasonal Time Series (`seasonal_time_series_all_seasons.png`)
-- 2×2 grid showing all 4 seasons
-- Bar charts comparing Actual vs Predicted TWS for each model
-- Error bars representing ±1 standard deviation
-
-#### Model Monthly Cycles (`model_monthly_cycles_with_std.png`)
-- Individual panel for each model
-- Line plots showing the annual TWS cycle (Jan–Dec)
-- Shaded regions representing ±1 standard deviation
-
-#### Model Seasonal Cycles (`model_seasonal_cycles_with_std.png`)
-- Individual panel for each model
-- Line plots with error bars showing seasonal progression
-- Comparison of Actual vs Predicted with uncertainty bands
-
-### Usage
-
-#### Command Line
-
-```bash
-# Generate maps using default settings
-python generate_monthly_maps.py
-
-# Specify custom paths
-python generate_monthly_maps.py \
-    --predictions-dir outputs/temporal \
-    --shapefile Data/Ganga\ Basin\ Shapefile/Ganga_basin.shp \
-    --output-dir outputs/maps
-```
-
-#### Python API
-
-```python
-from generate_monthly_maps import (
-    load_predictions,
-    load_basin_shapefile,
-    calculate_monthly_averages,
-    calculate_seasonal_averages,
-    plot_monthly_maps,
-    plot_seasonal_maps,
-    plot_monthly_time_series,
-    plot_seasonal_time_series,
-    plot_model_time_series_with_std,
-    plot_seasonal_cycle_with_std
-)
-
-# Load data
-predictions = load_predictions("outputs/temporal")
-basin_gdf = load_basin_shapefile("Data/Ganga Basin Shapefile/Ganga_basin.shp")
-
-# Calculate averages (includes std dev)
-monthly_avgs = calculate_monthly_averages(predictions)
-seasonal_avgs = calculate_seasonal_averages(predictions)
-
-# Generate spatial maps
-plot_monthly_maps(monthly_avgs, basin_gdf, "outputs/maps", data_type='Predicted_TWSA')
-plot_seasonal_maps(seasonal_avgs, basin_gdf, "outputs/maps", data_type='Predicted_TWSA')
-
-# Generate time series plots with standard deviation
-plot_monthly_time_series(monthly_avgs, "outputs/maps")
-plot_seasonal_time_series(seasonal_avgs, "outputs/maps")
-plot_model_time_series_with_std(predictions, monthly_avgs, "outputs/maps")
-plot_seasonal_cycle_with_std(seasonal_avgs, "outputs/maps")
-```
-
-### Output Files
-
-#### Spatial Maps
-
-| File | Description |
-|------|-------------|
-| `monthly_maps_{model}.png` | 12-panel monthly TWS maps |
-| `seasonal_maps_{model}.png` | 4-panel seasonal TWS maps |
-| `model_comparison_{month}.png` | All models compared for each month |
-| `model_comparison_{season}.png` | All models compared for each season |
-
-#### Time Series Plots
-
-| File | Description |
-|------|-------------|
-| `annual_cycle_comparison.png` | Line plot of annual TWS cycle (all models) |
-| `monthly_time_series_all_months.png` | Bar plots by month with std dev error bars |
-| `seasonal_time_series_all_seasons.png` | Bar plots by season with std dev error bars |
-| `model_monthly_cycles_with_std.png` | Monthly cycles per model with std dev shading |
-| `model_seasonal_cycles_with_std.png` | Seasonal cycles per model with error bars |
-
-#### Summary Tables
-
-| File | Description |
-|------|-------------|
-| `monthly_averages_all_models.csv` | Monthly statistics with std dev by model |
-| `seasonal_averages_all_models.csv` | Seasonal statistics with std dev by model |
-
-### Interpretation
-
-- **Blue shades**: Positive TWS anomaly (water surplus relative to baseline)
-- **Red/Brown shades**: Negative TWS anomaly (water deficit relative to baseline)
-- **Color intensity**: Magnitude of anomaly in millimeters (mm)
-- **Error bars/Shading**: Inter-annual variability (±1 standard deviation)
-
-Seasonal patterns typically show:
-- **Monsoon**: Strong positive anomalies due to precipitation recharge
-- **Post-Monsoon**: Peak water storage from monsoon accumulation
-- **Winter/Pre-Monsoon**: Declining storage due to groundwater extraction and ET
+**Independent** — `validate_wells.py` against 656 published CGWB dug wells: the
+only test using an observation the downscaling never saw.
+`validate_wells_scales.py` repeats it per-well, per-mascon and basin-wide,
+because neither side of the comparison observes groundwater storage directly and
+aggregation separates point-scale error from decomposition error.
 
 ---
 
-## Usage
+## Uncertainty
 
-### Command Line Interface
+`downscale_uncertainty.py` writes per-pixel terms, separately as well as
+combined:
+
+| term | measurable? |
+|---|---|
+| `sigma_grace` | yes — the GRACE product's own error band |
+| `sigma_transfer` | yes — leave-one-mascon-out RMSE by mascon and season |
+| `sigma_gap` | yes — synthetic blackouts, by regime and depth into the gap |
+| `sigma_within` | **lower bound only** — spread across the four-member tree ensemble |
+| `sigma_seed` | only when `--seeds` has more than one value; otherwise **not written**, so its absence is legible rather than looking like zero |
+
+The ensemble is the four tree models. The MLP is deliberately **not** a member —
+it exists for the comparison, and a structurally dissimilar member would widen a
+band already labelled a lower bound without a reader being able to tell whether
+that reflected real uncertainty or an architecture less suited to this design.
+
+---
+
+## Evaluation metrics
+
+| Metric | Formula | Optimal | Description |
+|---|---|---|---|
+| **MAE** | $\frac{1}{n}\sum\|y_i - \hat{y}_i\|$ | 0 | Mean absolute error |
+| **RMSE** | $\sqrt{\frac{1}{n}\sum(y_i - \hat{y}_i)^2}$ | 0 | Root mean squared error |
+| **R²** | $\left(\text{corr}(y,\hat{y})\right)^2$ | 1 | Squared Pearson — linear association, bias-insensitive |
+| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | 1 | Nash–Sutcliffe, bias-sensitive |
+| **PBIAS** | $100 \times \frac{\sum(\hat{y}_i - y_i)}{\sum y_i}$ | 0% | Percent bias |
+
+**R² and NSE are distinct, and both are reported.** They were previously
+identical, because "R²" was computed as $1 - SS_{res}/SS_{tot}$ — algebraically
+the NSE, which is why it could go negative. A high R² with a lower NSE signals
+good phase agreement with a magnitude bias.
+
+Confidence intervals come from `stats_utils`. For the gridded results the
+resampling unit is the **mascon**, not the row (`cluster_bootstrap_metric_cis`):
+~83,000 samples come from ~19 independent spatial units, so a row-wise bootstrap
+would count pixels as evidence.
+
+---
+
+## Reproducibility
+
+Every product records the environment that produced it — a `provenance` block in
+the summary JSON and matching netCDF global attributes: Python and library
+versions, the random seed, and the git commit. `environment.yml` pins the same
+versions.
+
+This is not bookkeeping. Gradient-boosting results are version-sensitive, and
+this project has been bitten by it: lightgbm 4.6 with scikit-learn 1.8 treats an
+ndarray fitted without feature names differently from earlier pairings.
+
+The fitted model is saved to `Results/downscaling/model_<name>.joblib` with its
+feature names, so SHAP or application to a new period does not require
+reproducing a whole run.
+
+---
+
+## Legacy basin-scale code
+
+**This was the initial method the project started with, and it is superseded.**
+It ran on `Data/All_Data.csv` — a single basin-mean series per time step — with
+six models (RandomForest, XGBoost, LightGBM, LSTM, BiLSTM, BiLSTM+Attention),
+random and temporal holdouts, SHAP, and a daily field produced by applying a
+monthly-trained model to daily inputs.
+
+Two structural limits ended it, both raised in peer review and neither fixable
+within that design:
+
+1. **Nothing could be held out spatially.** One series means no spatial
+   validation is even definable, so the approach could make no verifiable claim
+   about spatial pattern.
+2. **The daily field had no transfer function.** A model fitted on monthly
+   aggregates has none at daily scale, so its sub-monthly variability was an
+   artefact of the input rather than a learned relationship.
+
+The current method replaces the first with leave-one-mascon-out over 19 real
+mascons, and the second with disaggregation under an exact monthly constraint —
+nothing fitted at daily scale. See [METHODS.md](../METHODS.md) §11.
+
+Retained so the earlier manuscript's figures can be reproduced:
+
+| module | role |
+|---|---|
+| `run_analysis.py` | CLI for the basin-scale holdouts |
+| `holdout_random.py`, `holdout_temporal.py` | random and chronological splits |
+| `holdout_spatial.py` | **retired** — synthetic, leaked by construction (R² ≈ 0.99 by squared Pearson for a quantity the honest test puts near 0.05) |
+| `analyze_results.py` | post-hoc CIs, model comparison, leakage diagnostic |
+| `temporal_closure_validation.py` | daily → monthly closure against observed GRACE |
+| `tune_hyperparameters.py` | Optuna for the six basin-scale models |
+| `generate_monthly_maps.py` | **retired** — shades the whole basin polygon with one value per month; superseded per-pixel by `generate_gridded_maps.py`, and called by nothing |
 
 ```bash
-# Run all analyses with all models
-python run_analysis.py --analysis all --compare
-
-# Run specific analysis type
-python run_analysis.py --analysis temporal
-
-# Run with specific models
-python run_analysis.py -a random -m bilstm_attention xgboost lightgbm
-
-# Custom test size and seed
-python run_analysis.py -a temporal --test-size 0.3 --seed 42
-
-# Skip cross-validation
-python run_analysis.py -a spatial --no-cv
-
-# Custom data files
-python run_analysis.py --predictor-file my_data.xlsx --tws-file my_tws.xlsx
+./run_full_pipeline.sh --with-legacy
 ```
 
-### Python API
-
-```python
-from models import get_model, get_all_models
-from utils import load_and_preprocess_data, create_lagged_features, calculate_metrics
-
-# Load data
-merged = load_and_preprocess_data("All_Data.xlsx", "TWS_JPL.xlsx")
-lagged = create_lagged_features(merged, ['SMS', 'ET', 'rainfall', 'runoff', 'GWSA'], lags=7)
-
-# Prepare features
-feature_names = [f'{var}_lag{i}' for var in predictors for i in range(1, 8)]
-X = lagged[feature_names].values
-y = lagged['TWS'].values
-
-# Train a single model
-model = get_model('xgboost', seed=20, n_estimators=200)
-model.fit(X_train, y_train)
-predictions = model.predict(X_test)
-
-# Evaluate
-metrics = calculate_metrics(y_test, predictions)
-print(metrics)  # MAE, RMSE, R², NSE, PBIAS
-
-# Get feature importance (tree models only)
-importance = model.get_feature_importance(feature_names)
-```
-
-### Custom Model Configuration
-
-```python
-from models import get_model
-
-# Configure BiLSTM+Attention
-model = get_model(
-    'bilstm_attention',
-    seed=20,
-    hidden_size=128,
-    learning_rate=0.0005,
-    epochs=50,
-    batch_size=32
-)
-
-# Configure XGBoost
-model = get_model(
-    'xgboost',
-    seed=20,
-    n_estimators=200,
-    max_depth=8,
-    learning_rate=0.05,
-    subsample=0.8,
-    colsample_bytree=0.8
-)
-```
-
-## API Reference
-
-### models.py
-
-#### `get_model(model_name, seed=20, **kwargs)`
-
-Factory function to create model wrappers.
-
-**Arguments:**
-- `model_name`: One of `'bilstm_attention'`, `'bilstm'`, `'lstm'`, `'xgboost'`, `'lightgbm'`, `'randomforest'`
-- `seed`: Random seed for reproducibility
-- `**kwargs`: Model-specific parameters
-
-**Returns:** `BaseModelWrapper` instance
-
-#### `get_all_models(seed=20, **kwargs)`
-
-Get dictionary of all available models.
-
-**Returns:** `Dict[str, BaseModelWrapper]`
-
-### utils.py
-
-#### `load_and_preprocess_data(predictor_file, tws_file, predictors=None)`
-
-Load and merge predictor and TWS data.
-
-#### `create_lagged_features(df, cols, lags=7)`
-
-Create lagged features for time series modeling.
-
-#### `calculate_metrics(y_true, y_pred)`
-
-Calculate evaluation metrics (MAE, RMSE, R², NSE, PBIAS).
-
-**Returns:** `EvaluationMetrics` dataclass
-
-#### `plot_predictions(dates, y_true, y_pred, model_name, output_dir)`
-
-Generate prediction visualization plots.
-
-#### `plot_model_comparison(results, output_dir)`
-
-Create comparison plots for multiple models.
-
-### holdout_*.py
-
-#### `run_*_holdout_analysis(...)`
-
-Main entry point for each holdout strategy. Returns dictionary with:
-- `model`: Trained model wrapper
-- `train_metrics`: Training set metrics
-- `metrics`: Test set metrics
-- `train_time`: Training duration
-- `y_test_pred`: Test predictions
-
-## Output Files
-
-Each analysis generates:
-
-```
-figures/<holdout_type>_holdout/
-├── <prefix>_temporal_plot_<model>.png      # Time series plot
-├── <prefix>_scatter_plot_<model>.png       # Actual vs predicted scatter
-├── <prefix>_residuals_plot_<model>.png     # Residuals over time
-├── <prefix>_residual_hist_<model>.png      # Residual distribution
-├── <prefix>_training_loss_<model>.png      # Training loss (neural nets)
-├── <prefix>_feature_importance_<model>.png # Feature importance (tree models)
-├── <prefix>_predictions_<model>.csv        # Prediction results
-├── <prefix>_model_comparison.png           # Model comparison chart
-├── <prefix>_metrics_comparison.csv         # Metrics table
-├── <prefix>_train_test_comparison.png      # Train vs Test performance
-├── <prefix>_overfitting_analysis.png       # Overfitting gap analysis
-├── <prefix>_train_test_scatter.png         # Train vs Test R² scatter
-├── <prefix>_performance_heatmap.png        # Performance heatmap
-├── <prefix>_train_test_metrics.csv         # Combined train/test metrics
-├── <prefix>_overfitting_metrics.csv        # Overfitting analysis data
-├── <prefix>_summary_report.txt             # Text summary
-└── <prefix>_cv_results.csv                 # Cross-validation results
-```
-
-## Overfitting Analysis
-
-The framework automatically generates comprehensive overfitting analysis for all models, comparing training vs test performance.
-
-### Understanding Overfitting
-
-**Overfitting** occurs when a model learns the training data too well, including noise and random fluctuations, resulting in poor generalization to unseen data. Signs of overfitting include:
-
-- **High training performance, low test performance**: Large gap between train and test R²/NSE
-- **Very low training error**: Training RMSE/MAE much lower than test RMSE/MAE
-- **Perfect or near-perfect training fit**: Train R² ≈ 1.0 but Test R² << 1.0
-
-### Overfitting Indicators
-
-| Indicator | Formula | Interpretation |
-|-----------|---------|----------------|
-| **R² Gap** | Train R² - Test R² | > 0.10: Severe overfitting |
-| **RMSE Gap** | Test RMSE - Train RMSE | > 2 mm: Severe overfitting |
-| **NSE Gap** | Train NSE - Test NSE | > 0.10: Severe overfitting |
-
-### Interpretation Guidelines
-
-| R² Gap | Status | Recommendation |
-|--------|--------|----------------|
-| < 0.05 | ✓ Good | Model generalizes well |
-| 0.05 - 0.10 | ⚡ Moderate | Consider slight regularization |
-| > 0.10 | ⚠️ Severe | Reduce model complexity or add regularization |
-
-### Generated Visualizations
-
-1. **Train vs Test Comparison** (`train_test_comparison.png`): Side-by-side bar charts comparing R², NSE, MAE, and RMSE for training and test sets across all models.
-
-2. **Overfitting Gap Analysis** (`overfitting_analysis.png`): Bar charts showing R² and RMSE gaps with threshold lines for moderate (orange) and severe (red) overfitting.
-
-3. **Train-Test Scatter** (`train_test_scatter.png`): Scatter plot of Train R² vs Test R² with overfitting zones highlighted. Points below the 1:1 line indicate overfitting.
-
-4. **Performance Heatmap** (`performance_heatmap.png`): Color-coded heatmap showing Train/Test R² and NSE for quick visual comparison.
-
-### Model-Specific Overfitting Tendencies
-
-| Model Type | Overfitting Risk | Mitigation Strategies |
-|------------|-----------------|----------------------|
-| **Neural Networks** (LSTM, BiLSTM) | High | Early stopping, dropout, reduce hidden units |
-| **BiLSTM+Attention** | High | Attention regularization, reduce sequence length |
-| **Random Forest** | Moderate | Limit max_depth, increase min_samples_leaf |
-| **XGBoost** | Low-Moderate | L1/L2 regularization, lower learning rate |
-| **LightGBM** | Low-Moderate | Reduce num_leaves, increase min_data_in_leaf |
-
-### Example Output
-
-```
-======================================================================
-OVERFITTING ANALYSIS SUMMARY
-======================================================================
-
-R² Gap = Train R² - Test R² (Higher positive values indicate more overfitting)
-
-Interpretation Guidelines:
-  • R² Gap < 0.05: Good generalization (minimal overfitting)
-  • R² Gap 0.05-0.10: Moderate overfitting
-  • R² Gap > 0.10: Severe overfitting - model memorizing training data
-----------------------------------------------------------------------
-Model                Train R²    Test R²     R² Gap          Status
-----------------------------------------------------------------------
-BiLSTM+Attention       0.8234     0.7186     0.1048     ⚠️  SEVERE
-BiLSTM                 0.7856     0.6632     0.1224     ⚠️  SEVERE
-LSTM                   0.7654     0.6458     0.1196     ⚠️  SEVERE
-XGBoost                0.9123     0.7724     0.1399     ⚠️  SEVERE
-LightGBM               0.8834     0.7734     0.1100     ⚠️  SEVERE
-RandomForest           0.9456     0.7958     0.1498     ⚠️  SEVERE
-----------------------------------------------------------------------
-
-Recommendations:
-  • Models with SEVERE overfitting: All models
-    Consider: More regularization, fewer parameters, more training data
-======================================================================
-```
-
-## Evaluation Metrics
-
-| Metric | Formula | Optimal Value | Description |
-|--------|---------|---------------|-------------|
-| **MAE** | $\frac{1}{n}\sum\|y_i - \hat{y}_i\|$ | 0 | Mean Absolute Error |
-| **RMSE** | $\sqrt{\frac{1}{n}\sum(y_i - \hat{y}_i)^2}$ | 0 | Root Mean Squared Error |
-| **R²** | $\left(\text{corr}(y,\hat{y})\right)^2$ (squared Pearson) | 1 | Linear association (bias-insensitive) |
-| **NSE** | $1 - \frac{\sum(y_i - \hat{y}_i)^2}{\sum(y_i - \bar{y})^2}$ | 1 | Nash-Sutcliffe Efficiency (bias-sensitive) |
-| **PBIAS** | $100 \times \frac{\sum(\hat{y}_i - y_i)}{\sum y_i}$ | 0% | Percent Bias |
-
-## Example Workflow
-
-```python
-# Complete workflow example
-import os
-from models import get_model, set_seed
-from utils import (
-    load_and_preprocess_data, 
-    create_lagged_features,
-    prepare_features_target,
-    calculate_metrics,
-    plot_predictions,
-    save_predictions
-)
-from sklearn.model_selection import train_test_split
-
-# Set seed for reproducibility
-set_seed(42)
-
-# Configuration
-predictors = ['SMS', 'ET', 'rainfall', 'runoff', 'GWSA']
-lags = 7
-
-# Load and preprocess data
-merged = load_and_preprocess_data("All_Data.xlsx", "TWS_JPL.xlsx", predictors)
-lagged = create_lagged_features(merged.copy(), predictors, lags=lags)
-X, y, feature_names = prepare_features_target(lagged, predictors, 'TWS', lags)
-dates = lagged['Date'].values
-
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-dates_train, dates_test = dates[:len(X_train)], dates[len(X_train):]
-
-# Train and evaluate multiple models
-models_to_test = ['bilstm_attention', 'xgboost', 'lightgbm', 'randomforest']
-results = {}
-
-for model_name in models_to_test:
-    print(f"\nTraining {model_name}...")
-    
-    model = get_model(model_name, seed=42)
-    model.fit(X_train, y_train, verbose=True)
-    
-    y_pred = model.predict(X_test)
-    metrics = calculate_metrics(y_test, y_pred)
-    
-    results[model.name] = {
-        'metrics': metrics,
-        'predictions': y_pred
-    }
-    
-    print(f"Results: {metrics}")
-
-# Compare models
-print("\n" + "="*50)
-print("MODEL COMPARISON")
-print("="*50)
-for name, result in results.items():
-    m = result['metrics']
-    print(f"{name:20s} | R²: {m.r2:.4f} | RMSE: {m.rmse:.4f} | NSE: {m.nse:.4f}")
-```
+**Tuning sign convention.** `tune_hyperparameters.py` reports
+**ΔRMSE = tuned − default**, so a **negative** number means tuning reduced the
+error, and `tuning_summary.png` plots it directly with bars below zero as the
+improvements. This inverts an earlier "improvement %" convention, under which a
+model that tuning had made *worse* appeared as a negative number.
+`tune_gridded.py` uses the same convention.
+
+---
 
 ## Citation
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin. _Submitted to Groundwater for Sustainable Development._
 
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
+Thakur, P. K. (2026). *Explainable AI-Based Spatial Downscaling and Water
+Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over
+the Ganges River Basin.* Under review, **Groundwater for Sustainable
+Development**.

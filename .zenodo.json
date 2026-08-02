@@ -1,0 +1,79 @@
+{
+  "upload_type": "dataset",
+  "title": "Downscaled GRACE terrestrial water storage anomalies for the Ganga (Ganges) River Basin at 0.1°: Monthly and daily fields with per-pixel uncertainty, 2000–2025",
+  "description": "<p>A <strong>0.1&deg; monthly and daily terrestrial water storage anomaly (TWSA) product for the Ganga (Ganges) River Basin, 2000&ndash;2025</strong>, together with the source code, the inputs, and the full evaluation record that produced it. GRACE and GRACE-FO JPL RL06 mascons are spatially downscaled by fitting a predictor&ndash;TWSA relation across mascons; every mascon's area-weighted aggregate is then forced back onto the observed value. The monthly field is disaggregated to daily under an exact monthly constraint, its within-month shape supplied by the ERA5-Land water balance with nothing fitted at the daily scale. Per-pixel uncertainty is reported as four separate terms rather than one number, because only some of them are measurable against an observation.</p> <p><strong>What is imposed and what is learned.</strong> Each mascon's level and linear trend are taken from GRACE and never fitted &mdash; the secular signal here is groundwater abstraction, and no reanalysis simulates pumping. Only the sub-mascon anomaly is modelled, from 78 predictor features built on ERA5-Land and nine static covariates. Mass conservation then forces every mascon mean back onto the observation by a minimum-norm correction. <strong>Agreement with GRACE at mascon scale is therefore arithmetic, not evidence of skill</strong>: the basin mean of this product reproduces the GRACE basin mean at r = 1.00000, RMSE 0.29 mm. We state that plainly so it is not mistaken for validation.</p> <p><strong>Held-out performance.</strong> Skill is reported only where it can be measured &mdash; at spatial units the model never saw, at times it never saw, and against an independent observation.</p> <ul> <li><strong>Spatial (leave-one-mascon-out, 19 folds with a neighbour buffer):</strong> RMSE 88.2 mm, R&sup2; 0.638, NSE 0.635 over 83,309 held-out cell-months. Cluster bootstrap over mascons (2,000 resamples): RMSE 82.1&ndash;95.1 mm, R&sup2; 0.580&ndash;0.694.</li> <li><strong>Temporal (whole months held out):</strong> interior gap-filling RMSE 71.7 mm (R&sup2; 0.775); scattered months 74.5 mm (0.713); <strong>out-of-record extrapolation 91.1 mm (0.730)</strong>. The last is the regime the post-2024 months live in.</li> <li><strong>Independent (656 quality-controlled CGWB dug wells):</strong> at basin scale the downscaled field reaches r = 0.814, RMSE 57.0 mm against a bilinear-interpolation baseline at r = 0.742, RMSE 73.1 mm. Skill is strongly scale-dependent: median R&sup2; is 0.48 per mascon but 0.19 per well, and NSE exceeds zero at only 168 of 656 wells. Neither side is ground truth &mdash; a well is a point head times an estimated specific yield, the product a 0.1&deg; cell from a 3&deg; mascon &mdash; so the scale dependence is reported as the result rather than a single pooled number.</li> </ul> <p><strong>Read before use.</strong> Fine spatial structure is <em>inferred</em>, not observed: 19 independent mascons support 9,538 in-basin cells, an expansion of about two and a half orders of magnitude in spatial degrees of freedom. <strong>85 of the 312 months (27.2%) carry no GRACE observation</strong> and are reconstructions; they are flagged per time step by the <code>grace_observed</code> variable, and <code>sigma_gap</code> dominates their error budget. Daily variation is not observed at all &mdash; GRACE is monthly and the wells quarterly &mdash; so the sub-monthly shape is supported only by the agreement between two independent derivations, recorded as <code>daily_method_spread</code>. <code>sigma_within</code> is a <strong>lower bound</strong>, not a calibrated error: mass conservation forces every ensemble member to reproduce GRACE, so the remaining spread describes disagreement about within-mascon structure, which no observation constrains.</p> <p><strong>Contents.</strong> Four product netCDFs are left loose so they can be downloaded individually; everything else is bundled, because Zenodo caps a record at 100 files and this deposit holds roughly 14,900.</p> <ul> <li><code>twsa_0p1deg_monthly_with_uncertainty.nc</code> &mdash; <strong>the file to use</strong>: 312 &times; 101 &times; 179, with <code>twsa</code>, four sigma components, <code>sigma_total</code> and <code>grace_observed</code></li> <li><code>twsa_0p1deg_daily.nc</code> &mdash; 9,497 daily steps, two independent derivations plus their spread</li> <li><code>twsa_0p1deg_monthly_xgboost.nc</code> &mdash; the single-model intermediate the pipeline writes before the uncertainty ensemble</li> <li><code>trend_field.zip</code> &mdash; the per-pixel Theil-Sen trend with its Mann-Kendall significance, as netCDF and as a 9-band COG. The significance mask is shipped with the slope deliberately: a trend map without it invites over-reading, and the p-value is an ordering of pixels by strength of evidence rather than a calibrated error rate</li> <li><code>cogs_monthly.zip</code>, <code>cogs_daily.zip</code>, and the COG inside <code>trend_field.zip</code> &mdash; the same fields as cloud-optimised GeoTIFFs.</li> <li><code>evaluation_tables.zip</code>, <code>figures.zip</code> &mdash; every validation table behind the numbers above, and the figures</li> <li><code>inputs_*.zip</code>, <code>intermediates_*.zip</code> &mdash; raw Earth Engine downloads, static covariates, the basin boundary, the CGWB wells, and the derived cubes</li> </ul> <p>Read <code>DATA_README.md</code> in this record before using any of it.</p> <p><strong>Explore it in a browser, no download and no account:</strong> <a href=\"https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer\">https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer</a> &mdash; monthly and seasonal means, per-pixel time series with their uncertainty band, which months GRACE actually measured, and the significance-masked trend.</p> <p><strong>Earth Engine.</strong> The same rasters are mirrored as ImageCollections, so the product can be used without downloading it:</p> <ul> <li><code>projects/grace-grb-ml/assets/twsa_0p1deg_monthly_twsa__sigma_total</code> &mdash; 312 images, <code>b1</code> = <code>twsa</code>, <code>b2</code> = <code>sigma_total</code></li> <li><code>projects/grace-grb-ml/assets/twsa_0p1deg_daily_twsa_flux__twsa_state__daily_method_spread</code> &mdash; 9,497 images, <code>b1</code> = <code>twsa_flux</code>, <code>b2</code> = <code>twsa_state</code>, <code>b3</code> = <code>daily_method_spread</code></li> <li><code>projects/grace-grb-ml/assets/twsa_0p1deg_trend</code> &mdash; one image, <code>b1</code>&ndash;<code>b9</code> = <code>sen_slope</code>, <code>ols_slope</code>, <code>p_value</code>, <code>z_score</code>, <code>kendall_tau</code>, <code>variance_factor</code>, <code>significant</code>, <code>significant_fdr</code>, <code>tested</code></li> </ul> <p><strong>Band names do not survive Earth Engine ingestion</strong> &mdash; the collections carry <code>b1, b2, &hellip;</code> in file order, because the ingestion manifest has no field for band identifiers. The true order is listed above and also travels in every image's <code>bands</code> property, so <code>rename()</code> on read. Reconstructed months are filterable with <code>.filter(ee.Filter.eq('grace_observed', 1))</code>, which returns the 227 GRACE-observed months.</p> <p><strong>Two licences apply, and a Zenodo record carries only one field.</strong> This record is marked CC-BY-4.0, which covers the <strong>data products</strong>. The <strong>source code</strong> included here is licensed GPL-3.0-only under its own <code>LICENSE</code> file, and the CC-BY-4.0 grant does not extend to it.</p> <p><strong>Some archived inputs travel under their own terms, not this record's licence.</strong> <code>inputs_raw_gee.zip</code> and <code>inputs_static_covariates.zip</code> contain MERIT Hydro (CC-BY-NC-4.0 or ODbL-1.0), HWSD v2 (CC-BY-NC-SA-4.0), ESA C3S land cover (educational and scientific use, credit required) and the GLOBGM steady-state water table depth (GPL-3.0, a copyleft licence applied to a data product). Those copies remain governed by their providers. They enter the products only as 7 of 78 predictor columns, no raster of theirs is reproduced in the released fields, and none of their values can be recovered from the products &mdash; but whether such a licence propagates into a fitted model's output is not settled, and we flag the question rather than assert an answer. If your use is commercial, take it up with the upstream providers rather than relying on this record. This is a statement of position, not legal advice.</p> <p><strong>The CGWB well dataset</strong> in <code>inputs_cgwb_wells.zip</code> (Kuruva et al. 2025) is <strong>CC-BY-4.0</strong>, compatible with this record and redistributed here with attribution. It is used for independent validation only and is never a model input.</p> <p><strong>Attribution.</strong> Contains modified Copernicus Climate Change Service information 2026. Neither the European Commission nor ECMWF is responsible for any use that may be made of the Copernicus information or data it contains. GRACE/GRACE-FO mascon data courtesy of NASA JPL, supported by the NASA MEaSUREs Program: Wiese, D. N., Yuan, D.-N., Boening, C., Landerer, F. W., &amp; Watkins, M. M. (2023), <em>JPL GRACE and GRACE-FO Mascon Ocean, Ice, and Hydrology Equivalent Water Height, CRI Filtered</em>, PO.DAAC, <a href=\"https://doi.org/10.5067/TEMSC-3JC634\">10.5067/TEMSC-3JC634</a>. CGWB well data from Kuruva et al. (2025), <em>Scientific Data</em> <strong>12</strong>, 1609.</p> <p><strong>Code and development history:</strong> <a href=\"https://github.com/montimaj/grace-grb\">github.com/montimaj/grace-grb</a>, where <code>README.md</code> and <code>METHODS.md</code> are the method of record.</p>",
+  "creators": [
+    {
+      "name": "Kaushik, P. R.",
+      "affiliation": "CSIRO Environment, Dutton Park, Queensland 4102, Australia",
+      "orcid": "0000-0003-3826-7862"
+    },
+    {
+      "name": "Majumdar, S.",
+      "affiliation": "Division of Hydrologic Sciences, Desert Research Institute, Reno, Nevada, USA",
+      "orcid": "0000-0002-3539-0147"
+    },
+    {
+      "name": "Lenczuk, A.",
+      "affiliation": "Faculty of Civil Engineering and Geodesy, Military University of Technology, Warsaw, Poland",
+      "orcid": "0000-0002-9573-1302"
+    },
+    {
+      "name": "Sharma, Y. K.",
+      "affiliation": "Department of Civil Engineering, College of Engineering, Kyung Hee University, Yongin, Republic of Korea",
+      "orcid": "0009-0006-0038-5125"
+    },
+    {
+      "name": "Banerjee, S.",
+      "affiliation": "Department of Soil and Water Systems, University of Idaho-Boise, Boise, Idaho, USA",
+      "orcid": "0009-0003-6139-8403"
+    },
+    {
+      "name": "Thakur, P. K.",
+      "affiliation": "Water Resources Department, Indian Institute of Remote Sensing, ISRO, Dehradun, India",
+      "orcid": "0000-0002-2719-7021"
+    }
+  ],
+  "access_right": "open",
+  "license": "cc-by-4.0",
+  "version": "1.0.0",
+  "language": "eng",
+  "keywords": [
+    "GRACE",
+    "GRACE-FO",
+    "terrestrial water storage",
+    "groundwater depletion",
+    "spatial downscaling",
+    "temporal disaggregation",
+    "Ganga basin",
+    "Ganges river basin",
+    "machine learning",
+    "explainable AI",
+    "SHAP",
+    "ERA5-Land",
+    "uncertainty quantification"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "TODO-PAPER-DOI",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.21745158",
+      "relation": "isVersionOf",
+      "resource_type": "dataset",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer",
+      "relation": "isDocumentedBy",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ],
+  "notes": "INCOMPLETE - DO NOT PUBLISH until the TODO- values are replaced. Authors, ORCIDs and affiliations are complete and follow the manuscript citation order. Still outstanding: the paper DOI only. The TODO- values are deliberately malformed so the deposit fails validation rather than minting a permanent record full of placeholders; a published Zenodo record cannot be deleted. SINGLE COMBINED RECORD: code and data ship together, so the record-level licence (cc-by-4.0) describes the DATA and the bundled code stays GPL-3.0-only under its own LICENSE - the carve-out is stated in the description because the metadata has only one licence field. Archived inputs under their providers' terms rather than this record's licence: inputs_raw_gee.zip and inputs_static_covariates.zip (MERIT Hydro CC-BY-NC-4.0/ODbL-1.0, HWSD v2 CC-BY-NC-SA-4.0, ESA C3S research/education only, GLOBGM wtd GPL-3.0 copyleft). inputs_cgwb_wells.zip is CC-BY-4.0 and compatible. See DATA_README.md.",
+  "publication_date": "2026-08-01",
+  "doi": "10.5281/zenodo.21745159"
+}

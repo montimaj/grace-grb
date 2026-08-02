@@ -1,0 +1,134 @@
+{
+  "random_forest": {
+    "best_params": {
+      "n_estimators": 300,
+      "min_samples_leaf": 5,
+      "max_features": 0.4
+    },
+    "tuned_params": {
+      "n_estimators": 400,
+      "min_samples_leaf": 12,
+      "max_features": 0.3430244158799813
+    },
+    "adopted": "defaults",
+    "tuned_cv_rmse": 76.81010585330645,
+    "default_cv_rmse": 76.6016185840669,
+    "delta_rmse": 0.20848726923955496,
+    "delta_rmse_pct": 0.2721708406340649,
+    "n_trials": 15,
+    "fold_sd": 6.615460561816653,
+    "cv": "GroupKFold(n_splits=5) by mascon, anomaly target, no neighbour buffer"
+  },
+  "xgboost": {
+    "best_params": {
+      "n_estimators": 300,
+      "learning_rate": 0.019328896981021824,
+      "max_depth": 12,
+      "subsample": 0.502964745241954,
+      "colsample_bytree": 0.30744682190805545,
+      "reg_lambda": 0.2900885732245732,
+      "min_child_weight": 5
+    },
+    "tuned_params": {
+      "n_estimators": 300,
+      "learning_rate": 0.019328896981021824,
+      "max_depth": 12,
+      "subsample": 0.502964745241954,
+      "colsample_bytree": 0.30744682190805545,
+      "reg_lambda": 0.2900885732245732,
+      "min_child_weight": 5
+    },
+    "adopted": "tuned",
+    "tuned_cv_rmse": 76.32383933798981,
+    "default_cv_rmse": 77.06253000421229,
+    "delta_rmse": -0.7386906662224817,
+    "delta_rmse_pct": -0.9585601020133966,
+    "n_trials": 15,
+    "fold_sd": 6.61756063282754,
+    "cv": "GroupKFold(n_splits=5) by mascon, anomaly target, no neighbour buffer"
+  },
+  "lightgbm": {
+    "best_params": {
+      "n_estimators": 600,
+      "learning_rate": 0.011049478451877266,
+      "num_leaves": 234,
+      "subsample": 0.9744677998378952,
+      "colsample_bytree": 0.6966122314355676,
+      "min_child_samples": 32
+    },
+    "tuned_params": {
+      "n_estimators": 600,
+      "learning_rate": 0.011049478451877266,
+      "num_leaves": 234,
+      "subsample": 0.9744677998378952,
+      "colsample_bytree": 0.6966122314355676,
+      "min_child_samples": 32
+    },
+    "adopted": "tuned",
+    "tuned_cv_rmse": 77.22841801964503,
+    "default_cv_rmse": 77.6137750643965,
+    "delta_rmse": -0.3853570447514727,
+    "delta_rmse_pct": -0.49650599321027766,
+    "n_trials": 15,
+    "fold_sd": 6.64998279185023,
+    "cv": "GroupKFold(n_splits=5) by mascon, anomaly target, no neighbour buffer"
+  },
+  "xgboost_rf": {
+    "best_params": {
+      "n_estimators": 350,
+      "max_depth": 13,
+      "subsample": 0.8876224469971814,
+      "colsample_bynode": 0.32566501449476004,
+      "reg_lambda": 6.559279632055913e-06,
+      "min_child_weight": 16
+    },
+    "tuned_params": {
+      "n_estimators": 350,
+      "max_depth": 13,
+      "subsample": 0.8876224469971814,
+      "colsample_bynode": 0.32566501449476004,
+      "reg_lambda": 6.559279632055913e-06,
+      "min_child_weight": 16
+    },
+    "adopted": "tuned",
+    "tuned_cv_rmse": 77.39883999333911,
+    "default_cv_rmse": 79.1477211334596,
+    "delta_rmse": -1.7488811401204885,
+    "delta_rmse_pct": -2.2096418128975683,
+    "n_trials": 15,
+    "fold_sd": 6.588847216501547,
+    "cv": "GroupKFold(n_splits=5) by mascon, anomaly target, no neighbour buffer"
+  },
+  "mlp": {
+    "best_params": {
+      "hidden_layer_sizes": [
+        64
+      ],
+      "alpha": 0.001,
+      "learning_rate_init": 0.0003,
+      "max_iter": 1000,
+      "early_stopping": true,
+      "n_iter_no_change": 12,
+      "batch_size": 1024
+    },
+    "tuned_params": {
+      "hidden_layer_sizes": [
+        64
+      ],
+      "alpha": 0.001,
+      "learning_rate_init": 0.0003,
+      "max_iter": 1000,
+      "early_stopping": true,
+      "n_iter_no_change": 12,
+      "batch_size": 1024
+    },
+    "adopted": "fixed",
+    "tuned_cv_rmse": 77.08707781346037,
+    "default_cv_rmse": 77.08707781346037,
+    "delta_rmse": 0.0,
+    "delta_rmse_pct": 0.0,
+    "n_trials": 0,
+    "fold_sd": 5.98184538975723,
+    "cv": "GroupKFold(n_splits=5) by mascon, anomaly target, no neighbour buffer"
+  }
+}
