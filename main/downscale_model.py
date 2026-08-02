@@ -475,7 +475,7 @@ class CVResult:
         Any question of the form "when in the year is the model wrong, and by how
         much?" needs the predictions themselves, and it must be these ones: the
         fitted product reproduces GRACE at basin scale by construction (measured
-        at r = 1.00000, RMSE 0.29 mm), so comparing IT against GRACE would draw
+        at r = 1.00000, RMSE 0.27 mm), so comparing IT against GRACE would draw
         two identical curves. Only predictions made for a mascon the model never
         saw can say anything.
         """

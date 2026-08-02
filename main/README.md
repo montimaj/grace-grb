@@ -111,7 +111,7 @@ sweep that has gone stale is announced rather than found later in a figure.
 | `validate_wells_scales.py` | the same wells at three aggregation scales, plus the residual map |
 | `downscale_annual_cycle.py` | annual cycle scored against **out-of-fold** predictions — the basin mean of the product is GRACE's by construction, so scoring the product against GRACE would measure nothing |
 | `export_cogs.py` | COGs + `geeup` upload script |
-| `make_zenodo_bundles.sh` | assembles the deposit — zips everything except the four product netCDFs, which stay loose. Zenodo caps a record at 100 files and this one holds ~28,000 |
+| `make_zenodo_bundles.sh` | assembles the deposit — zips everything except the three product netCDFs and `DATA_README.md`, which stay loose. Zenodo caps a record at 100 files and this one holds ~15,000 |
 
 ### Shared
 

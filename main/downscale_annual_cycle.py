@@ -8,10 +8,10 @@ GRACE, month by month -- cannot say anything. Mass conservation pins the
 area-weighted mascon mean to the observation, so the basin mean of the published
 field IS GRACE's. Measured over the 227 observed months it agrees at
 
-    RMSE 0.29 mm,  r = 1.00000
+    RMSE 0.27 mm,  r = 1.00000
 
 which would draw two curves exactly on top of each other and a residual panel
-flat at a third of a millimetre. A reader would take that for extraordinary
+flat at a quarter of a millimetre. A reader would take that for extraordinary
 skill. It is arithmetic.
 
 So the comparison here uses LEAVE-ONE-MASCON-OUT predictions: for each mascon,
@@ -205,7 +205,7 @@ def plot_annual_cycle(series: pd.DataFrame, model_name: str,
         'GRACE against leave-one-mascon-out predictions — each mascon predicted '
         'by a model fitted without it or any of its neighbours. The published '
         'product is NOT used here: mass conservation pins its basin mean to '
-        'GRACE (r = 1.00000, RMSE 0.29 mm over the 227 observed months), so '
+        'GRACE (r = 1.00000, RMSE 0.27 mm over the 227 observed months), so '
         'plotting it would draw one curve twice. (a) climatological month means. '
         '(b) the same difference on its own axis, where a seasonal bias of a few '
         'tens of mm is legible rather than lost in the ~250 mm range of (a). '
