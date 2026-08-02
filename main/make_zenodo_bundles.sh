@@ -5,8 +5,9 @@
 # --------------
 # Not for space. The netCDFs are already internally compressed (zlib level 4)
 # and the COGs are DEFLATE, so zipping them returns about 1%. Zip is here for
-# FILE COUNT: Zenodo caps a record at 100 files and this deposit contains ~28,000.
-# Everything except the four product netCDFs is therefore bundled, and the
+# FILE COUNT: Zenodo caps a record at 100 files and this deposit contains ~15,000
+# (9,500 daily COGs and 4,698 raw GEE rasters between them account for most).
+# Everything except the three product netCDFs is therefore bundled, and the
 # netCDFs stay loose because they are what people actually come for -- burying
 # the 31 MB monthly field inside an 838 MB archive would force a large download
 # on anyone who wants the small file.

@@ -390,7 +390,7 @@ run python generate_gridded_maps.py --model "$GRIDDED_MODEL"  # per-pixel climat
 
 # Annual cycle of the basin, scored on LEAVE-ONE-MASCON-OUT predictions rather
 # than on the published field. The product's basin mean is pinned to GRACE by
-# mass conservation (r = 1.00000, RMSE 0.29 mm over the 227 observed months), so
+# mass conservation (r = 1.00000, RMSE 0.27 mm over the 227 observed months), so
 # plotting the product against GRACE would draw one curve twice and read as
 # perfect skill. Reads lomo_oof_<model>.csv, written by downscale_model.py.
 run python downscale_annual_cycle.py --model "$GRIDDED_MODEL"
