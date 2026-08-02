@@ -1,23 +1,80 @@
 # Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin
 
+> **On "Ganga" and "Ganges".** They are the same river. The manuscript title, the
+> figure plates and the abstract use **Ganges**, the exonym the journal's
+> readership will search for; body text and code use **Ganga**, the official
+> name used by the Central Water Commission and by CGWB, whose wells are the
+> validation set here. The Zenodo record glosses both. The mix is deliberate, and
+> three occurrences must never be "corrected": the `Ganga Basin Shapefile/`
+> path, the `rivname == 'Ganga'` value in the Government of India river network
+> that draws the main channel in Figure 1, and the published Earth Engine asset
+> id `ganga_basin`. Renaming any of those breaks something silently.
+
+### 🌍 [Explore the product in your browser](https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer)
+
+No download, no Earth Engine account. Monthly and seasonal means, per-pixel
+time series with their ±1σ band, which months GRACE actually measured, and
+the significance-masked trend. Source in [`gee/`](gee/).
+
 ## Citation
+
+### The paper
+
 Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
 
 > Title revised from "Explainable AI-Based Temporal Downscaling of GRACE Terrestrial Water Storage in the Ganges River Basin". The original described the earlier basin-scale analysis, and its "temporal downscaling" would overstate the daily component of this work: the daily field is disaggregated under an exact monthly constraint, not downscaled. "Downscaling" now attaches to the spatial step, where a predictor–TWSA relation is fitted across mascons and interpreted with SHAP; the daily step is disaggregation, its within-month shape supplied by the ERA5-Land water balance with nothing fitted. See [METHODS.md](METHODS.md) for the distinction.
+
+### The data and code
+
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
+Thakur, P. K. (2026). _Downscaled GRACE terrestrial water storage anomalies
+for the Ganga (Ganges) River Basin at 0.1°: Monthly and daily fields with
+per-pixel uncertainty, 2000–2025_ [Data set]. Zenodo.
+https://doi.org/10.5281/zenodo.21745159
+
+> **That is the VERSION DOI for v1.0.0**, which is what a paper should cite: it
+> pins the exact artefact rather than whatever was released last. **All
+> versions:** https://doi.org/10.5281/zenodo.21745158 — the concept DOI, which
+> always resolves to the most recent release. Code and data ship as **one
+> record**: it is marked CC-BY-4.0, which covers the data, while the bundled
+> source code remains GPL-3.0-only under its own `LICENSE`.
+
 
 ## Abstract
 
 > **The abstract below describes the ORIGINAL basin-scale manuscript and is
 > superseded.** Several of its claims no longer hold: the "antecedent SMS ~80% of
 > explanatory power / storage memory" result rested on a GLDAS 2.2 field that
-> **assimilates GRACE**, `GWSA` contains no groundwater (it is de-meaned runoff),
+> **assimilates GRACE**, `GWSA` contained no groundwater (it is de-meaned
+> runoff, and is now carried under the honest name `runoff_anom`),
 > and all MAE/RMSE were reported 10x too small (centimetres labelled millimetres).
 > The current work is a per-pixel **0.1 degree daily** product for 2000-2025 with
 > per-pixel uncertainty. See [METHODS.md](METHODS.md).
 
 Terrestrial water storage anomalies (TWSA) are a key indicator of hydrological variability in a basin and are widely used to assess groundwater sustainability and climate-driven changes in the water cycle. GRACE and GRACE-FO satellite gravimetry are an invaluable source of observations of TWSA, but due to their low spatial resolution and monthly time resolution they cannot be directly used to carry out high-resolution hydrological analysis and water resource management, especially in monsoon-controlled basins. This study fills this gap in the temporal downscaling and prediction of TWSA down to a daily resolution and physical interpretability of the Ganges River Basin. We develop an explainable artificial intelligence (XAI) model that combines GRACE-derived TWSA with daily hydroclimatic predictors, including precipitation, evapotranspiration (ET), soil moisture storage (SMS), surface runoff, and groundwater storage anomalies, evaluated with random and temporal holdout strategies and interpreted with SHapley Additive exPlanations (SHAP). The ensemble tree-based models (Random Forest and XGBoost) perform best under the random and temporal validation schemes and are statistically indistinguishable from each other, while outperforming the recurrent-network models. Because GRACE observes TWSA only monthly, daily-scale skill is assessed indirectly through a temporal closure test, in which the predicted daily TWSA is re-aggregated to monthly and compared against the original monthly GRACE; this confirms strong temporal self-consistency. SHAP analysis shows that antecedent SMS is the primary predictor of TWSA (about 80% of the total explanatory power), followed by lagged ET (about 10-15%), with relatively minor direct effects of precipitation, providing a mechanistic, storage-memory-based explanation of the reconstructed seasonal cycles. The framework enhances GRACE-based hydrological monitoring by providing interpretable TWSA prediction that can support groundwater assessment and climate-resilient water-resource management in data-sparse regions.
 
-<img src="Data/Readme_Figs/Graphical_Abstract.png" width="600"/>
+![Graphical abstract](figures/output/Graphical_Abstract.png)
+
+## The study area and the method
+
+![Study area](figures/output/Fig1_study_area.png)
+
+**The basin, and the problem.** 656 CGWB monitoring wells over the Ganga basin,
+with the river network and terrain. Panel (c) is the constraint the whole project
+works against: GRACE resolves **19 mascons** over this basin, and the product asks
+for **9,538 cells** at 0.1°. Fine structure is therefore *inferred* from
+ERA5-Land, never observed, and agreement with GRACE at mascon scale is imposed by
+construction rather than earned. India is drawn from a Survey of India consistent
+outline.
+
+![Method workflow](figures/output/Fig2_workflow.png)
+
+**What is fitted and what is not.** Level and trend are taken from GRACE per
+mascon and never fitted — the basin's secular decline is groundwater abstraction,
+and no reanalysis simulates pumping — so only the anomaly is learned. Mass
+conservation is imposed rather than learned. The daily field is *disaggregated*
+under an exact monthly constraint, with nothing fitted at the daily scale. Both
+figures are regenerated by [`figures/`](figures/).
 
 ## Project Structure
 
@@ -25,25 +82,28 @@ Terrestrial water storage anomalies (TWSA) are a key indicator of hydrological v
 grace-grb/
 ├── README.md                           # This file
 ├── LICENSE
+├── environment.yml                     # PINNED environment — the versions every result was produced under
 ├── Data/
-│   ├── All_Data.xlsx                   # Daily predictors (SMS, ET, rainfall, runoff, GWSA)
+│   ├── README.md
+│   ├── All_Data.csv                    # Daily predictors, generated by build_all_data.py
 │   ├── TWS_GRACE_GEE.csv               # GRACE target, generated by export_basin_grace.py
-│   ├── TWS_JPL.xlsx                    # LEGACY target, superseded (see note below)
 │   ├── Ganga Basin Shapefile/          # Basin boundary
 │   ├── Groundwater/                    # CGWB wells (Kuruva et al. 2025) - validation only
 │   ├── Gridded/                        # Generated: native-grid GeoTIFFs + netCDF cubes (~10 GB, gitignored)
 │   │   ├── raw/                        #   one GeoTIFF per (grid, variable, month)
 │   │   ├── cubes/                      #   era5/gldas/grace cubes + grids_aux.nc
 │   │   └── wells/                      #   ingested well metadata and GWS anomalies
-│   ├── Outputs/                        # Processed basin-mean CSVs
-│   └── Readme_Figs/
+│   └── Outputs/                        # Processed basin-mean CSVs
 ├── Results/
-│   ├── downscaling/                    # 0.1 deg products, spatial CV, well validation
+│   ├── README.md
+│   ├── downscaling/                    # THE PRODUCTS: 0.1 deg monthly + daily, and all
+│   │                                   #   gridded evidence (spatial CV, month holdouts,
+│   │                                   #   gap recovery, well validation)
+│   ├── tuning/                         # Optuna outputs (gridded, and legacy basin-scale)
 │   └── figures/
-│       ├── temporal_holdout/           # Temporal holdout outputs
-│       ├── random_holdout/             # Random holdout outputs
-│       ├── monthly_seasonal_maps/      # Basin-scale summaries (one value per polygon)
-│       └── gridded_maps/               # Per-pixel 0.1 deg maps
+│       ├── gridded_maps/               # Per-pixel 0.1 deg maps
+│       ├── temporal_holdout/           # LEGACY basin-scale holdout outputs
+│       └── random_holdout/             # LEGACY basin-scale holdout outputs
 ├── main/
 │   ├── README.md                       # Detailed methods and API reference
 │   ├── run_full_pipeline.sh               # SINGLE ENTRY POINT - regenerates everything
@@ -55,45 +115,71 @@ grace-grb/
 │   ├── plot_style.py                   # Central figure styling (600 DPI, clean labels)
 │   │
 │   │   # --- basin-scale (temporal downscaling) ---
-│   ├── run_analysis.py                 # CLI entry point for the holdout analyses
+│   ├── run_analysis.py                 # LEGACY basin-scale holdouts (--with-legacy)
 │   ├── holdout_random.py               # Random holdout
 │   ├── holdout_temporal.py             # Temporal (chronological) holdout
 │   ├── holdout_spatial.py              # RETIRED - synthetic, leaked by construction
 │   ├── analyze_results.py              # Post-hoc CIs, model comparison, leakage diagnostic
-│   ├── temporal_closure_validation.py  # Daily -> monthly closure test
-│   ├── tune_hyperparameters.py         # Optuna tuning (walk-forward CV)
-│   ├── generate_monthly_maps.py        # Basin-scale monthly/seasonal summaries
+│   ├── temporal_closure_validation.py  # LEGACY daily -> monthly closure test
+│   ├── tune_hyperparameters.py         # LEGACY basin-scale Optuna tuning
+│   ├── generate_monthly_maps.py        # RETIRED - superseded by generate_gridded_maps.py
 │   ├── gee_download.py                 # Basin-mean predictor download from GEE
 │   │
-│   │   # --- gridded (spatial downscaling to 0.1 deg) ---
-│   ├── gridded_config.py               # Grids, dataset specs, unit provenance
+│   │   # --- gridded (spatial downscaling to 0.1 deg) -- THE METHOD ---
+│   ├── gridded_config.py               # Grids, dataset specs, unit provenance, ACTIVE_COVARIATES
 │   ├── gee_gridded_download.py         # Native-grid GeoTIFF export from GEE
+│   ├── gee_static_download.py          # Static + annual covariates on the 0.1 deg grid
 │   ├── build_cube.py                   # netCDF cubes, basin mask, mascon partition
 │   ├── export_basin_grace.py           # GRACE target from the gridded cube  <- run first
-│   ├── build_all_data.py               # rebuild All_Data.xlsx from the GEE download
+│   ├── build_all_data.py               # rebuild All_Data.csv from the GEE download
 │   ├── downscale_grid_ops.py           # Exact area-overlap regridding operators
 │   ├── downscale_features.py           # Gridded feature construction
-│   ├── downscale_model.py              # Spatial CV + 0.1 deg product + mass conservation
+│   ├── tune_gridded.py                 # Optuna for tree candidates + CV selection of the product model
+│   ├── mlp_configuration_sweep.py      # ONE-OFF: fixes the MLP's configuration, releases the sweep
+│   ├── downscale_model.py              # Spatial CV + 0.1 deg monthly product + mass conservation
+│   ├── downscale_shap.py               # TreeSHAP on the fitted model, grouped by feature family
 │   ├── downscale_uncertainty.py        # Per-pixel uncertainty ensemble
-│   ├── generate_gridded_maps.py        # Maps from the gridded product
+│   ├── downscale_daily.py              # DAILY product (water-balance disaggregation)
+│   ├── downscale_holdouts.py           # Month holdouts: random / blocked / forward
+│   ├── downscale_ablation.py           # Does the design matrix earn its size?
+│   ├── downscale_covariate_gate.py     # Standalone covariate diagnostic (no longer selects)
+│   ├── generate_gridded_maps.py        # Per-pixel maps from the gridded product
 │   ├── wells_ingest.py                 # CGWB well ingest (validation set)
-│   └── validate_wells.py               # Independent validation vs wells
+│   ├── validate_wells.py               # Independent validation vs wells, in mm
+│   ├── validate_wells_scales.py        # Well comparison at three aggregation scales
+│   └── export_cogs.py                  # COGs + geeup upload script
+├── figures/                            # Manuscript figures: scripts AND rendered output
+│   ├── README.md
+│   ├── fetch_data.py                   # Re-downloads the basemaps; refuses a non-SOI boundary
+│   ├── make_fig1_study_area.py
+│   ├── make_fig2_workflow.py
+│   ├── data/                           # Generated: ~845 MB of basemaps, gitignored
+│   └── output/                         # Fig1, Fig2 (PDF + PNG) and FIGURE_CAPTIONS.md
+├── paper/                              # Manuscript, reviewer materials, response letter
+│   ├── README.md
+│   └── spatial/                        # The LIVE revision materials
+├── CITATION.cff                        # Citation metadata for the code record
+├── .zenodo.json                        # Zenodo deposit metadata (OVERRIDES CITATION.cff)
+├── DATA_README.md                      # README for the separate Zenodo DATA record
+└── METHODS.md                          # The scientific method: what is fitted, what is not
 ```
 
-> **On the two target files.** `TWS_GRACE_GEE.csv` is generated by
-> `export_basin_grace.py` and is the target everything now uses.
-> `TWS_JPL.xlsx` is retained only so earlier results can be reproduced: it has no
-> recorded provenance, contains malformed month names (`'January '` ×20,
-> `'july'` ×1) that silently dropped 8.9% of the GRACE record, stores
-> centimetres while being labelled millimetres, and correlates only r = 0.94
-> with a properly area-weighted basin mean of the product it claims to be.
-> `utils.read_grace_monthly()` reads both and now raises rather than dropping.
+> **On the GRACE target.** `TWS_GRACE_GEE.csv`, generated by
+> `export_basin_grace.py`, is the target everything uses. An earlier
+> `TWS_JPL.xlsx` was **removed from the repository**: it had no recorded
+> provenance, contained malformed month names (`'January '` ×20, `'july'` ×1)
+> that silently dropped 8.9% of the GRACE record, stored centimetres while
+> labelled millimetres, and correlated only r = 0.94 with a properly
+> area-weighted basin mean of the product it claimed to be.
+> `utils.read_grace_monthly()` still accepts the .xlsx layout — and now raises
+> rather than dropping rows — so a restored copy would be read correctly, but no
+> such file ships and `--compare` is therefore a no-op.
 
 > **Scope note.** The original analysis is a **basin-scale (spatially integrated) temporal** downscaling: all inputs are basin-mean series, so those results are not per-pixel and the corresponding "maps" are basin-scale summaries. The daily target is a linear interpolation of monthly GRACE (no independent daily observation), so daily consistency is assessed via the **temporal closure test** (`temporal_closure_validation.py`).
 
 ## Gridded (spatial) downscaling
 
-A second pipeline produces a **0.1° (~11 km, ERA5-Land native grid) monthly TWSA product** for the Ganga basin, 2003–2024, with per-pixel uncertainty. It supersedes the basin-scale maps and the synthetic spatial holdout.
+A second pipeline produces a **0.1° (~11 km, ERA5-Land native grid) monthly TWSA product** for the Ganga basin, 2000–2025, with per-pixel uncertainty. It supersedes the basin-scale maps and the synthetic spatial holdout.
 
 ```bash
 cd main
@@ -107,11 +193,13 @@ python gee_gridded_download.py     # native-grid stacks (~5 GB)
 python gee_static_download.py      # static covariates (53 rasters)
 python build_cube.py               # netCDF cubes + mascon partition + static cube
 python export_basin_grace.py       # GRACE target  <- everything depends on this
-python downscale_covariate_gate.py # which covariates earn a place (auto-promotes)
+                                   # (no covariate gate: all nine are used)
 python downscale_model.py          # spatial CV + 0.1 deg monthly product
+python downscale_shap.py           # TreeSHAP attribution (trees only; explains the ANOMALY)
 python downscale_uncertainty.py    # per-pixel uncertainty ensemble
 python downscale_daily.py          # DAILY 0.1 deg product
 python generate_gridded_maps.py    # figures
+python wells_ingest.py             # CGWB wells -> validation set (validate_wells needs it)
 python validate_wells.py           # independent well comparison
 python export_cogs.py              # COGs + geeup upload script
 ```
@@ -139,11 +227,19 @@ monthly product and would learn to reproduce that assumption.
 
 ### Covariates
 
-Nine static/annual covariates (water table depth, AWC, root depth, elevation,
-sub-grid relief, log upstream area, height above drainage, irrigated and rainfed
-cropland) are downloaded to the 0.1 deg grid. Which ones the model uses is
-decided by `downscale_covariate_gate.py` on **held-out** skill and picked up
-automatically via `covariate_survivors.json`; `GRACE_COVARIATES` overrides it.
+Nine covariates on the 0.1 deg grid, **all used**. Seven are static (water table
+depth, AWC, root depth, elevation, sub-grid relief, log upstream area, height
+above drainage); two are **annual** — irrigated and rainfed cropland fraction
+from C3S, one value per year 2000–2022, held constant after 2022.
+
+There is no selection step. A gate (`downscale_covariate_gate.py`) previously
+chose the set on held-out skill and admitted none of the nine; it was removed
+because it scored on **seasonal-anomaly** R² while the model fits only the
+anomaly and takes level and trend from GRACE — so annual land use, which acts on
+the depletion **trend**, was being judged on a component it cannot move. Details
+in [METHODS.md](METHODS.md) §5.2. The set is pinned in
+`gridded_config.ACTIVE_COVARIATES`; `COVARIATES_OVERRIDE` or the
+`GRACE_COVARIATES` env var override it.
 
 Categorical land cover is one-hot masked at its native 309 m *before*
 aggregation. Requesting the class field directly at 10 km makes Earth Engine
@@ -170,7 +266,7 @@ The predictors transfer the monsoon cycle across space well and cannot predict t
 
 ### The product is gap-filled
 
-GRACE observes 219 of the 263 months in the record; the rest — most importantly the
+GRACE observes 227 of the 312 months in the record; the rest — most importantly the
 ~11-month **GRACE → GRACE-FO transition** — have no observation. The 0.1° product is a
 **single, continuous, gap-filled field**: every month carries a value.
 
@@ -198,6 +294,77 @@ depends on the trend staying linear across the gap.
 
 **Independent validation** uses 656 quality-controlled CGWB dug wells inside the basin (Kuruva et al., *Sci Data* 12, 1609, 2025; [figshare](https://doi.org/10.6084/m9.figshare.29293877)), converted to groundwater storage anomalies via ΔGWS = −S<sub>y</sub>·Δh on the GRACE 2004–2010 baseline. Wells are quarterly, so they validate spatial pattern and seasonal amplitude, never daily structure.
 
+## Final products
+
+Everything below is written by `main/run_full_pipeline.sh` into
+`Results/downscaling/`. All three data products share one grid: **0.1°**,
+lat **21.5–31.5 °N** (101), lon **73.4–91.2 °E** (179), **9,538 in-basin cells**
+of 18,079; anomalies in **mm** on the JPL RL06 **2004.0–2010.0** baseline;
+`NaN` outside the basin. Each file carries its own caveats as netCDF global
+attributes — read them before use.
+
+### The three data products
+
+| file | grid | time | variables | size |
+|---|---|---|---|---|
+| **`twsa_0p1deg_monthly_with_uncertainty.nc`**<br>*the product to use* | 312 × 101 × 179 | monthly, 2000-01 → 2025-12 | `twsa` (ensemble mean), `sigma_total`, `sigma_grace`, `sigma_transfer`, `sigma_within`, `sigma_gap`, `grace_observed` | 31 MB |
+| **`twsa_0p1deg_daily.nc`** | 9497 × 101 × 179 | daily, 2000-01-01 → 2025-12-31 | `twsa_flux` (primary), `twsa_state`, `daily_method_spread`, `grace_observed` | 801 MB |
+| `twsa_0p1deg_monthly_xgboost.nc` | 312 × 101 × 179 | monthly, 2000-01 → 2025-12 | `twsa`, `grace_observed` | 9.9 MB |
+
+The single-model monthly file is the intermediate `downscale_model.py` writes,
+named for whichever model selection picked — `twsa_0p1deg_monthly_<model>.nc`,
+and likewise every `*_<model>.csv` and `*_<model>.json` below. `xgboost` appears
+throughout only because it is the fallback `run_full_pipeline.sh` uses when
+`Results/tuning/selected_model.txt` is absent;
+the uncertainty file supersedes it (four-member ensemble: RandomForest, XGBoost,
+LightGBM and XGBoost's random-forest mode,
+plus the five error terms) and is what should be cited or distributed.
+
+### Three things to read off before using any of them
+
+- **27.2% of the record is reconstruction, not observation.** 227 of 312 months
+  are GRACE-observed; the other 85 have no mass constraint (daily: 2,586 of 9,497
+  days). `grace_observed` is `0` there. Mask on it for observation-only use, and
+  expect `sigma_gap` to dominate the error budget in those months.
+- **Fine structure is inferred.** 19 independent mascons support 9,538 cells, so
+  agreement with GRACE at mascon scale is imposed by mass conservation and is
+  **not** evidence of skill. The evidence is `lomo_cv_xgboost.csv` and
+  `well_validation_summary.csv`.
+- **Daily variation is not observed at all.** GRACE is monthly and the wells are
+  quarterly, so nothing validates the sub-monthly shape directly; the two routes
+  agree to `daily_method_spread`, and both re-aggregate to the monthly field
+  exactly (closure ≤ 0.0005 mm for `twsa_flux`, ≤ 0.0055 mm for `twsa_state`).
+  `sigma_within` is likewise a **lower bound**, not a calibrated error.
+
+### The evidence behind them
+
+These are the files that decide whether the product is trustworthy; they are
+outputs in their own right, not scratch.
+
+| file | rows | what it answers |
+|---|---|---|
+| `well_validation_summary.csv` | 2 | downscaled vs bilinear against 656 wells — **the only non-circular test** |
+| `well_validation_by_scale.csv` | 3+ | the same wells scored per-well, per-mascon and basin-wide — the scale at which the comparison is made changes the verdict |
+| `well_validation_store_comparison.csv` | 4 | the product under both store definitions (ERA5 / GLDAS), showing the choice does not decide the test. **Not produced by a default run** — `validate_wells.py --compare-stores` |
+| `lomo_cv_xgboost.csv` | 19 | leave-one-mascon-out skill, one row per mascon: does it transfer across **space** |
+| `holdouts_month_xgboost.csv` | 3 | month holdouts — `random` / `blocked` / `forward`: does it transfer across **time** |
+| `gap_recovery_rmse_by_depth.csv` | 32 | reconstruction error vs months into a blackout, by regime (interior / forward / backward) |
+| `feature_ablation_xgboost.csv` | 5 | does the design matrix earn its size? Configurations scored on the tuner's own grouped CV, with repeats |
+| `covariate_gate_xgboost.csv` | 10 | each covariate's individual held-out skill (retired gate; not regenerated) |
+| `covariate_gate_joint_sets_xgboost.csv` | 4 | covariate skill in combination — the record behind using all nine. **Produced by a one-off analysis, not by any script in the repo**; retained as evidence, not reproducible from `downscale_covariate_gate.py`, which scores one covariate at a time |
+| `transfer_rmse_by_mascon_season.csv` | 684 | spatial-transfer error by mascon × calendar month (feeds `sigma_transfer`) |
+| `temporal_holdout_xgboost.csv` | 11 | forward-block error vs months beyond the training record |
+| `well_validation_matches.csv` | one row per matched well-month | the per-observation matches behind the summary |
+| `summary_xgboost.json` | — | pooled CV metrics, conservation residuals, per-month `grace_observed` |
+
+> **Open issue, pending re-measurement.** On the well test the downscaled field
+> did **not** beat bilinear interpolation (RMSE 254 vs 244 mm; median well
+> r 0.385 vs 0.442). Those numbers came from a superseded build (before the nine covariates were admitted; the matrix is now **78 features**),
+> before the nine covariates — including irrigated cropland, the field most
+> plausibly relevant to a groundwater-well comparison — were admitted. They must
+> be re-read from the current run before anything is concluded. (Tracked in a
+> working-copy `TODO.md`, which is gitignored and therefore absent from a clone.)
+
 ## Running the project
 
 ### 1. Download and install Anaconda/Miniconda
@@ -219,22 +386,58 @@ Unzip all zipped files.  Several of the input datasets in this repository are zi
 
 #### Repository disk space requirements
 
+Two different quantities, kept apart because every `.nc` and `.tif` is
+gitignored: what a clone costs, and what a full run generates.
+
 | Component | Size | Description |
 |-----------|------|-------------|
-| Data/ | ~150 MB | Input data (GRACE TWS, ERA5-Land and GLDAS variables, shapefiles) |
-| Results/ | ~150 MB | Generated outputs (figures, predictions, maps) |
+| Data/ (tracked) | ~120 MB | Basin shapefile, CGWB wells, predictor CSVs |
+| Results/ (tracked) | <1 MB | Small text evidence only |
 | main/ | <1 MB | Source code |
-| **Total** | **~500 MB** | Full repository with all outputs |
+| **Total, as cloned** | **~121 MB** | Measured with `git ls-files` |
+| Data/Gridded/ (generated) | ~12 GB | Native-grid GeoTIFFs and netCDF cubes |
+| Results/downscaling/ (generated) | ~850 MB | 801 MB daily + 31 MB monthly + 9.9 MB single-model |
 
-**Note:** The Results folder size will vary depending on how many analyses are run and which models are used.
+**Note:** the generated rows depend on how much of the pipeline is run; none of
+it is in git.
 
-### 3. Creating the conda environment and installing packages
-Open Linux/Mac terminal or Windows PowerShell and run the following:
+### 3. Creating the conda environment
+
+Use the **pinned** environment file. Open a Linux/Mac terminal or Windows
+PowerShell in the repository root:
+
+```bash
+conda env create -f environment.yml
+conda activate grace-grb
 ```
+
+> **Why pinned, and why it matters here.** Gradient-boosting results depend on
+> library versions, and this project has been bitten by it: LightGBM 4.6 with
+> scikit-learn 1.8 treats an ndarray fitted without feature names differently
+> from earlier pairings. An unpinned install reproduces the *code* but not
+> necessarily the *numbers*.
+>
+> `environment.yml` pins the full environment (~25 packages). Each product also
+> carries a `provenance` record of the versions that matter to the numbers — a `provenance` block in the
+> summary JSON and matching netCDF global attributes — so a data file states its
+> own environment even when separated from this repository:
+>
+> ```bash
+> python -c "import json; print(json.load(open('Results/downscaling/summary_xgboost.json'))['provenance'])"
+> ncdump -h Results/downscaling/twsa_0p1deg_monthly_xgboost.nc | grep provenance_
+> ```
+
+<details>
+<summary>Unpinned install (not recommended — will not reproduce the reported numbers exactly)</summary>
+
+```bash
 conda create -y -n grace-grb python=3.12
 conda activate grace-grb
-conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue swifter shap optuna
+conda install -y -c conda-forge rioxarray gdal geopandas lightgbm py-xgboost \
+    earthengine-api rasterstats seaborn openpyxl pytorch dask-ml dask-jobqueue \
+    swifter shap optuna
 ```
+</details>
 
 ### 4. Google Earth Engine Authentication
 This project relies on the Google Earth Engine (GEE) Python API for downloading (and reducing) some of the predictor datasets from the GEE
@@ -257,15 +460,21 @@ cd main
 
 # One-time: download the gridded stacks (~5 GB, ~15 min, hits Earth Engine)
 python gee_gridded_download.py
+python gee_static_download.py   # covariates; without them build_cube.py writes no
+                                # static_cube.nc and the pipeline's preflight FAILS
 python build_cube.py
 
-# Then regenerate every result in the project (both halves, 11 steps)
+# Then regenerate the product and its validation (the legacy half needs --with-legacy)
 bash run_full_pipeline.sh
 ```
 
-`run_full_pipeline.sh` is the single entry point. It logs to `run_full_pipeline.log`
-and continues past any failing step, so one broken stage never silently truncates
-the rest.
+`run_full_pipeline.sh` is the single entry point, logging to
+`run_full_pipeline.log`. It has **two step classes**: `require` steps abort the
+run on failure, because everything after them would otherwise consume a stale or
+absent file; `run` steps log and continue, and are used only for leaf steps whose
+failure cannot corrupt anything downstream. An earlier version used `run` for
+everything, so a failed first step left every later step reading an absent GRACE
+target while still reporting success.
 
 #### Step by step
 
@@ -277,47 +486,89 @@ python export_basin_grace.py --compare   # -> Data/TWS_GRACE_GEE.csv
 
 Derives the basin-mean GRACE series from the same gridded mascon product the 0.1°
 pipeline uses, so both halves rest on one source. `--compare` reports agreement
-with the legacy `TWS_JPL.xlsx`.
+with a legacy `TWS_JPL.xlsx` if one is present; none ships, so it is a no-op.
 
-**Basin-scale (temporal downscaling)**
+**Gridded (spatial downscaling to 0.1°) — this is the method**
 
 ```bash
-python run_analysis.py --analysis all --compare      # random + temporal holdouts
-python run_analysis.py --analysis temporal           # one holdout only
-python run_analysis.py -a random -m xgboost lightgbm # specific models
+python wells_ingest.py                     # CGWB wells -> independent validation set
+python tune_gridded.py --all              # tunes the FOUR TREE candidates (15 trials each); the
+                                          # MLP is scored at its released fixed configuration rather
+                                          # than searched (--search-fixed overrides). All five are
+                                          # then ranked and the winner written to
+                                          # Results/tuning/selected_model.txt
+python tune_gridded.py --select           # re-run the ranking only, from the existing JSON
+python mlp_configuration_sweep.py         # ONE-OFF (~1 h): settles the MLP's fixed configuration
+python mlp_configuration_sweep.py --plot-only   # redraw the sweep figure from the CSV
+python downscale_model.py --model xgboost  # spatial CV + 0.1 deg monthly product
+                                          # (run_full_pipeline.sh passes the SELECTED model here)
+python downscale_model.py --skip-product   # spatial CV only (fast)
+python downscale_uncertainty.py            # per-pixel uncertainty ensemble
+python downscale_daily.py                  # DAILY product, disaggregated under an exact monthly constraint
 
-python generate_monthly_maps.py                      # basin-scale summaries
+python downscale_holdouts.py --model xgboost  # month holdouts: random / blocked / forward
+python generate_gridded_maps.py            # per-pixel climatology, seasonal, trend, uncertainty
+python validate_wells.py                   # downscaled vs wells vs interpolation, in mm
+python validate_wells_scales.py            # wells at three scales: per-well / mascon / basin
+```
+
+Validation covers two axes, deliberately separated. `downscale_model.py` measures
+transfer across **space** (leave-one-mascon-out over 19 mascons);
+`downscale_holdouts.py` measures transfer across **time** by holding out whole
+months, in three schemes — `random`, `blocked`, `forward`. The random one is
+reported but labelled optimistic: monthly TWSA is autocorrelated, so a random
+split leaves each held-out month's neighbours in training. Read the gap between
+`random` and `forward`, and quote `forward`.
+
+**Legacy basin-scale (superseded)**
+
+Retained only so the earlier manuscript's figures can be reproduced. These are
+**basin-mean** analyses: one value for the whole basin per time step. They share
+no code path with the downscaling above, and nothing in the current method reads
+their output.
+
+```bash
+./run_full_pipeline.sh --with-legacy    # or the individual scripts:
+
+python tune_hyperparameters.py --models randomforest xgboost lightgbm --trials 50 --splits 4
+python tune_hyperparameters.py --models lstm bilstm bilstm_attention --nn-trials 15 --splits 3
+python tune_hyperparameters.py --summarize           # tuning_summary.{csv,md,png}
+python run_analysis.py --analysis all --compare \
+       --tuned-params ../Results/tuning/best_params.json
 python analyze_results.py --holdout-dir ../Results/figures/temporal_holdout --n-boot 2000
 python analyze_results.py --leakage --models randomforest xgboost lightgbm
 python temporal_closure_validation.py --predictions-dir ../Results/figures/temporal_holdout
-python tune_hyperparameters.py                       # optional, Optuna
 ```
 
-**Gridded (spatial downscaling to 0.1°)**
+The trial and fold counts are the ones the earlier results came from
+(`main/tune_trees.log`, `main/tune_nn.log`), not the script defaults; the trees
+were tuned over 4 walk-forward folds and the nets over 3.
 
-```bash
-python wells_ingest.py                    # CGWB wells -> independent validation set
-python downscale_model.py --model xgboost # spatial CV + 0.1 deg product
-python downscale_model.py --skip-product  # spatial CV only (fast)
-python downscale_uncertainty.py           # per-pixel uncertainty ensemble
-python generate_gridded_maps.py           # maps from the gridded product
-python validate_wells.py                  # downscaled vs wells vs interpolation
-```
+> **Retired outright.** `generate_monthly_maps.py` is no longer called by any
+> pipeline: it coloured the whole basin polygon with a single value per month,
+> which `generate_gridded_maps.py` supersedes per pixel. `--analysis spatial` is
+> also retired and exits with an explanation — the synthetic spatial holdout
+> leaked by construction, and its replacement is `downscale_model.py --skip-product`.
 
-> `--analysis spatial` is **retired** and exits with an explanation. The synthetic
-> spatial holdout leaked by construction; its replacement is
-> `python downscale_model.py --skip-product`.
+#### Available models
 
-#### Available Models
-- `bilstm_attention` - BiLSTM with Attention mechanism
-- `bilstm` - Bidirectional LSTM
-- `lstm` - Standard LSTM
-- `xgboost` - XGBoost Regressor
-- `lightgbm` - LightGBM Regressor
-- `random_forest` - Random Forest Regressor
+**Gridded (the method)** — `--model` on `downscale_model.py` and
+`downscale_holdouts.py`; `--models`/`--all` on `tune_gridded.py`:
 
-Tree ensembles are used for the gridded pipeline; the recurrent models are
-basin-scale only.
+- `xgboost`, `lightgbm` — gradient boosting
+- `random_forest`, `xgboost_rf` — bagging (the latter is XGBoost's forest mode)
+- `mlp` — a neural model, as imputation → standardisation → MLP. Fixed
+  configuration from a released sweep, not a per-run search
+
+The **uncertainty ensemble** is the four tree models; the MLP is for comparison
+only. Recurrent and convolutional networks are excluded for structural reasons —
+no sequence exists for an LSTM to consume, and no fine-scale observation exists
+to train a CNN against. See [METHODS.md](METHODS.md) §6.
+
+**Legacy basin-scale** — `run_analysis.py --models`, only under `--with-legacy`:
+`bilstm_attention`, `bilstm`, `lstm`, `xgboost`, `lightgbm`, `random_forest`.
+
+
 
 #### Output Files
 
@@ -329,12 +580,11 @@ basin-scale only.
 - Leakage diagnostic (shuffled vs blocked vs purged + embargo cross-validation)
 - Temporal closure test (daily predictions re-aggregated to monthly vs observed GRACE)
 
-`Results/downscaling/` — gridded:
-- `twsa_0p1deg_monthly_<model>.nc` — the 0.1° monthly TWSA product
-- `twsa_0p1deg_monthly_with_uncertainty.nc` — product + `sigma_total`, `sigma_grace`, `sigma_transfer`, `sigma_within`
-- `lomo_cv_<model>.csv` — leave-one-mascon-out skill per mascon
-- `transfer_rmse_by_mascon_season.csv` — spatial-transfer error by mascon and calendar month
-- `well_validation_summary.csv` — downscaled vs interpolation, scored against the wells
+`Results/downscaling/` — gridded: the three netCDF products, the per-pixel
+trend-significance field (`twsa_trend_significance.nc`), and the evidence
+files, enumerated with dimensions, variables and caveats under
+[Final products](#final-products). That section is the manifest; this list is
+deliberately not a second copy of it.
 
 `Results/figures/gridded_maps/` — per-pixel monthly climatology, seasonal means,
 trend, uncertainty components, and the downscaling-versus-interpolation comparison.
