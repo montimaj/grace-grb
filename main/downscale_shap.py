@@ -687,11 +687,24 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    fig = plt.figure(figsize=(11.4, 8.8))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 1.15], hspace=0.32, wspace=0.62)
+    # Drawn at the width it is PLACED at. Laid out at 11.4 in and reproduced in a
+    # 6.3 in column, this plate lost 45% of its linear size and its 7.5 pt family
+    # labels fell to about 4 pt, which is what made it unreadable in review.
+    #
+    # The panels are also STACKED rather than set two-across. Side by side in a
+    # single column each bar chart gets ~2.6 in, and the family names on the y
+    # axis ("Water balance (P minus ET minus Q)") are longer than the axis they
+    # label. Stacked, every panel gets the full column width and the labels fit
+    # at a size a reader can actually read.
+    fig = plt.figure(figsize=(6.3, 8.6))
+    # Explicit bounds rather than tight_layout: a gridspec with per-panel
+    # legends is not tight_layout-compatible, and calling it left a band of
+    # empty page between the title and panel (a).
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.0, 0.78, 1.25], hspace=0.55,
+                          top=0.955, bottom=0.045, left=0.30, right=0.985)
     ax_f = fig.add_subplot(gs[0, 0])
-    ax_t = fig.add_subplot(gs[0, 1])
-    ax_c = fig.add_subplot(gs[1, :])
+    ax_t = fig.add_subplot(gs[1, 0])
+    ax_c = fig.add_subplot(gs[2, 0])
 
     def bars(ax, frame, label_col, colours, title):
         d = frame.sort_values('share_pct').reset_index(drop=True)
@@ -702,10 +715,10 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
         ax.errorbar(d.share_pct, y, xerr=np.vstack([lo, hi]), fmt='none',
                     ecolor=SCI_INK, elinewidth=1.0, capsize=2.5, zorder=4)
         ax.set_yticks(y)
-        ax.set_yticklabels(d[label_col], fontsize=7.5, color=SCI_INK)
+        ax.set_yticklabels(d[label_col], fontsize=6.5, color=SCI_INK)
         ax.set_xlabel('Share of total mean absolute attribution (%)', color=SCI_INK,
-                      fontsize=8.5)
-        ax.set_title(title, fontsize=9.5, color=SCI_INK, loc='left')
+                      fontsize=7)
+        ax.set_title(title, fontsize=8, color=SCI_INK, loc='left')
         return d
 
     bars(ax_f, field, 'family', SCI_BLUE,
@@ -724,7 +737,7 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
          f'c. Top {min(top_n, len(top))} individual columns, for comparison -- '
          'one field is split across several bars')
     handles = [plt.Rectangle((0, 0), 1, 1, color=cmap[f]) for f in order]
-    ax_c.legend(handles, order, frameon=False, fontsize=7.5, loc='lower right')
+    ax_c.legend(handles, order, frameon=False, fontsize=6, loc='lower right')
 
     for ax in (ax_f, ax_t, ax_c):
         ax.grid(True, axis='x', color=SCI_GRID, lw=0.6, zorder=0)
@@ -733,18 +746,17 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
             ax.spines[side].set_visible(False)
         for side in ('left', 'bottom'):
             ax.spines[side].set_color(SCI_MUTED)
-        ax.tick_params(colors=SCI_MUTED, labelsize=7.5)
+        ax.tick_params(colors=SCI_MUTED, labelsize=6.5)
 
     fig.suptitle(f'TWSA anomaly attribution, {pretty_model(model_name)} '
                  '(TreeSHAP, association only)',
-                 fontsize=11, color=SCI_INK, x=0.012, ha='left', y=0.997)
+                 fontsize=9, color=SCI_INK, x=0.012, ha='left', y=0.992)
     # Caption recorded, not drawn -- see figure_captions.
     figure_captions.record(
         out_path,
         SCOPE_NOTE + ' ' + COLLINEARITY_NOTE + ' Whiskers are 95% intervals '
         'from a bootstrap over mascons; they price mascon sampling only, not '
         'the collinearity.')
-    fig.tight_layout(rect=(0, 0.02, 1, 0.985))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     fig.savefig(out_path, dpi=DPI, bbox_inches='tight', facecolor='white')
     plt.close(fig)

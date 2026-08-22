@@ -423,11 +423,13 @@ def plot_metric_maps(obs: pd.DataFrame, out_dir: str) -> Optional[str]:
     if per_well.empty:
         return None
 
-    # Narrow rather than wide. The basin is ~1.6:1 and geopandas fixes the
-    # aspect, so in a broad figure each map is limited by its row height and
-    # leaves most of its column empty. Sizing the width down until the maps are
-    # limited by their column instead is what fills the panels.
-    fig, axes = plt.subplots(3, 2, figsize=(11.2, 10.0), layout='constrained')
+    # Drawn at the width it is PLACED at, not wider. A figure laid out at 11 in
+    # and dropped into a 6.3 in journal column is reduced by ~45%, which takes
+    # 7 pt tick labels to about 4 pt and is what made this plate unreadable in
+    # review. Sizing the canvas to the column means the type below is the type
+    # the reader gets. The basin is ~1.6:1 and geopandas fixes the aspect, so the
+    # height follows from three rows of maps plus their labels.
+    fig, axes = plt.subplots(3, 2, figsize=(6.3, 7.6), layout='constrained')
     flat = axes.ravel()
     try:
         basin = cfg.load_basin()
@@ -445,26 +447,26 @@ def plot_metric_maps(obs: pd.DataFrame, out_dir: str) -> Optional[str]:
                         s=13, edgecolor=SCI_INK, linewidth=0.15, zorder=3)
         cax = ax.inset_axes([1.02, 0.0, 0.022, 1.0], transform=ax.transAxes)
         cb = fig.colorbar(sc, cax=cax, extend=extend)
-        cb.ax.tick_params(labelsize=7, colors=SCI_INK)
+        cb.ax.tick_params(labelsize=6, colors=SCI_INK)
         if spec['integer']:
             # A count of months has no half-values; the default locator was
             # ticking 47.5 and 52.5, which name months that cannot be counted.
             cb.locator = MaxNLocator(integer=True)
             cb.update_ticks()
         _style_axis(ax)
-        ax.tick_params(labelsize=7)
+        ax.tick_params(labelsize=6)
         # Every panel carries its own axis labels rather than only the outer
         # ones: these panels get lifted into slides and talks one at a time, and
         # a lone map with bare numbers on both axes is ambiguous.
-        ax.set_xlabel('Longitude (°E)', color=SCI_INK, fontsize=8)
-        ax.set_ylabel('Latitude (°N)', color=SCI_INK, fontsize=8)
+        ax.set_xlabel('Longitude (°E)', color=SCI_INK, fontsize=7)
+        ax.set_ylabel('Latitude (°N)', color=SCI_INK, fontsize=7)
         ax.set_title(f'({letter}) {spec["label"]}', fontweight='bold',
-                     color=SCI_INK, loc='left', fontsize=10, pad=14)
+                     color=SCI_INK, loc='left', fontsize=8.5, pad=10)
         ax.text(0.0, 1.015, spec['note'], transform=ax.transAxes,
-                fontsize=7.5, color=SCI_MUTED, ha='left', va='bottom')
+                fontsize=6, color=SCI_MUTED, ha='left', va='bottom')
 
     fig.suptitle(f'Product skill against {len(per_well)} CGWB dug wells, well by well',
-                 fontweight='bold', color=SCI_INK, fontsize=13, x=0.006, ha='left')
+                 fontweight='bold', color=SCI_INK, fontsize=10, x=0.006, ha='left')
     p = os.path.join(out_dir, 'well_metric_maps.png')
     figure_captions.record(
         p,
