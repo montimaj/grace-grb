@@ -217,8 +217,8 @@ permits it, but there is no reason to re-host what Copernicus already serves.
 
 Reproduced from `DATA_README.md` (the Zenodo data-record README), which carries
 the fuller discussion of the NonCommercial conflict and what it does and does not
-reach. Entries marked **not established** are recorded nowhere in the repository
-and must be settled before anything is published.
+reach. This table and the one in `DATA_README.md` must agree; where a provider
+states terms in more than one place, the stricter reading is given.
 
 | input | lands in | source identifier | licence |
 |---|---|---|---|
@@ -228,9 +228,9 @@ and must be settled before anything is published.
 | MERIT Hydro v1.0.1 | `Gridded/static/upa_log.tif`, `hnd.tif` | `MERIT/Hydro/v1_0_1` | **CC-BY-NC-4.0 or ODbL-1.0** (dual) |
 | HWSD v2 | `Gridded/static/awc.tif`, `root_depth.tif` | `projects/sat-io/open-datasets/FAO/HWSD_V2_SMU` | **CC-BY-NC-SA-4.0** |
 | ESA C3S land cover (LCCS) | `Gridded/static/crop_irrigated_*.tif`, `crop_rainfed_*.tif` | `projects/sat-io/open-datasets/ESA/C3S-LC-L4-LCCS` | **educational and/or scientific use only**, credit required |
-| GLOBGM steady-state water table depth | `Gridded/static/wtd.tif` | `projects/sat-io/open-datasets/GLOBGM/STEADY-STATE/globgm-wtd-ss` | **not established** |
+| GLOBGM steady-state water table depth | `Gridded/static/wtd.tif` | `projects/sat-io/open-datasets/GLOBGM/STEADY-STATE/globgm-wtd-ss` | **GPL-3.0** as distributed (Verkaik et al., 2024) — a copyleft licence applied to a data product, so treat redistribution with care |
 | NASADEM | `Gridded/static/elevation.tif`, `elevation_std.tif` | `NASA/NASADEM_HGT/001` | NASA, public domain |
-| CGWB groundwater levels (Kuruva et al. 2025) | `Groundwater/`, `Gridded/wells/` | figshare `10.6084/m9.figshare.29293877` | **not established** — the *Sci Data* article being CC-BY does not settle the dataset's licence, and figshare returned 403 when checked |
+| CGWB groundwater levels (Kuruva et al. 2025) | `Groundwater/`, `Gridded/wells/` | figshare `10.6084/m9.figshare.29293877` | **CC-BY-4.0** (Kuruva et al., 2025) — compatible with this record and redistributed here with attribution |
 | Ganga basin boundary | `Ganga Basin Shapefile/` | provenance not recorded | CC-BY-4.0, asserted by the authors |
 
 ERA5-Land and the C3S land cover both require the Copernicus attribution

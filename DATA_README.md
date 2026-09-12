@@ -37,10 +37,15 @@ than let a downstream user assume the whole chain is permissive:
 | **HWSD v2** (FAO/IIASA) | the `awc` and `root_depth` covariates | **CC-BY-NC-SA-4.0** |
 | **ESA C3S land cover (LCCS)** | the `crop_irrigated` and `crop_rainfed` covariates | educational and/or scientific use, credit required |
 
-These are **model covariates**, not layers reproduced in the released files: no
-MERIT, HWSD or C3S raster is redistributed here, and none of their values can be
-recovered from the products. What the products carry is the influence of six of
-seventy-eight predictor columns on a fitted anomaly field.
+These are **model covariates**, and none of their values can be recovered from
+the released products — what the products carry is the influence of six of
+seventy-eight predictor columns on a fitted anomaly field. The source rasters
+themselves, however, **are** redistributed in this record, in
+`inputs_static_covariates.zip` (`upa_log.tif`, `hnd.tif`, `awc.tif`,
+`root_depth.tif`, `crop_irrigated_*.tif`, `crop_rainfed_*.tif`, `wtd.tif`). Those
+copies travel under their providers' terms, **not** under this record's
+CC-BY-4.0. If your use is commercial, take it up with the upstream providers
+rather than relying on this record.
 
 **What this notice does and does not do.** It discharges the attribution those
 licences require, and it tells you what stands behind the product. It does not
@@ -146,8 +151,9 @@ contents.
 | `cogs_monthly.zip` | the monthly product as cloud-optimised GeoTIFFs, two bands (`twsa`, `sigma_total`) | 312 rasters + `metadata.csv` + `upload.sh` |
 | `cogs_daily.zip` | the daily product as COGs, three bands (`twsa_flux`, `twsa_state`, `daily_method_spread`) | 9,497 rasters + `metadata.csv` + `upload.sh` |
 | `trend_field.zip` | the per-pixel trend in both formats: `twsa_trend_significance.nc` and a 9-band COG (`sen_slope`, `ols_slope`, `p_value`, `z_score`, `kendall_tau`, `variance_factor`, `significant`, `significant_fdr`, `tested`) | 4 |
-| `evaluation_tables.zip` | every validation table and the tuning record — see *Evaluation files* below. The fitted model (`model_<model>.joblib`) and the output-tree README ship with the code archive, not here | 23 |
-| `figures.zip` | per-pixel maps, diagnostic figures, and the manuscript figures | 22 |
+| `evaluation_tables.zip` | every validation table and the tuning record — see *Evaluation files* below. The fitted model (`model_<model>.joblib`) and the output-tree README ship with the code archive, not here | 24 |
+| `figures.zip` | per-pixel maps, diagnostic figures, and the manuscript figures | 30 |
+| `grace-grb-1.0.1.zip` | the source tree at the tagged release, GPL-3.0-only under its own `LICENSE`; also holds the fitted model (`model_<model>.joblib`) and the output-tree README | 149 |
 | `inputs_raw_gee.zip` | the raw Earth Engine downloads the ERA5-Land and GRACE cubes are built from; GLDAS tiles excluded | 4,680 |
 | `inputs_static_covariates.zip` | the nine static covariate rasters | 53 |
 | `inputs_basin_shapefile.zip` | the Ganga basin boundary | 8 |
@@ -160,11 +166,13 @@ uncertainty ensemble; the uncertainty file supersedes it and is what should be
 cited or redistributed. `<model>` is whichever candidate won cross-validation in
 the run that produced this release — it is **not** fixed to XGBoost.
 
-**The two `inputs_*` archives that are third-party data** —
-`inputs_raw_gee.zip` and `inputs_cgwb_wells.zip` — are redistributed under the
-terms of their own providers, not under this record's CC-BY-4.0. See *Third-party
-inputs* below before reusing them; the products and evaluation tables carry no such
-restriction.
+**`inputs_static_covariates.zip` is the archive to read the licences for.** It
+carries MERIT Hydro, HWSD v2, the ESA C3S land cover and GLOBGM, each under its
+own provider's terms rather than this record's CC-BY-4.0 — see *Third-party
+inputs* below before reusing it. `inputs_raw_gee.zip` is ERA5-Land (CC-BY-4.0)
+and GRACE (public domain); `inputs_cgwb_wells.zip` is CC-BY-4.0 (Kuruva et al.,
+2025), compatible with this record. The products and evaluation tables carry no
+such restriction.
 
 Sizes above are for the reference run; check the record's own file listing for
 this release's exact bytes.
@@ -250,8 +258,8 @@ right, not scratch. Full descriptions are in the repository `README.md`.
 | `gap_recovery_rmse_by_depth.csv` | reconstruction error vs months into a blackout, by regime |
 | `transfer_rmse_by_mascon_season.csv` | spatial-transfer error by mascon × calendar month (feeds `sigma_transfer`) |
 | `temporal_holdout_<model>.csv` | forward-block error vs months beyond the training record |
+| `trend_by_region.csv` | Theil-Sen trend summaries for the basin and its four quadrants, with the bounds that define each region |
 | `feature_ablation_xgboost.csv` (always this name — the ablation is scored with xgboost defaults regardless of which model is selected) | whether the design matrix earns its size |
-| `covariate_gate_<model>.csv` | each covariate's individual held-out skill (retired gate) |
 | `summary_<model>.json` | pooled CV metrics, conservation residuals, per-month `grace_observed`, provenance |
 
 The `random` month holdout is reported but is labelled optimistic in its own
@@ -299,10 +307,9 @@ ts = ds[["twsa", "sigma_total"]].sel(lat=26.5, lon=82.0, method="nearest")
 
 ## Third-party inputs
 
-The product is derived from the datasets below. Licences are as recorded in
-`TODO.md` D1 and in `main/gridded_config.py`; the ones marked **not established**
-were not recorded anywhere in the repository and must be settled before this
-record is published.
+The product is derived from the datasets below. The table is the record of
+licences; where a provider states terms in more than one place, the stricter
+reading is given.
 
 This table and the *Required attribution* block below must also be pasted into
 the Zenodo record description. A reader who downloads a single netCDF never opens

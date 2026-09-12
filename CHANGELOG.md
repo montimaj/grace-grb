@@ -19,9 +19,11 @@ Versions track the Zenodo record. The scientific method of record is
 Changes made while answering the second round of review for *Groundwater for
 Sustainable Development*. No value in the product changed: the 0.1° monthly and
 daily fields, the model and the uncertainty components are bit-for-bit those of
-1.0.0. What changed is that numbers quoted in the paper became reproducible —
-which added one result file, `Results/downscaling/trend_by_region.csv`, and three
-figure scripts.
+1.0.0. Two things changed. Numbers quoted in the paper became reproducible, which
+added one result file, `Results/downscaling/trend_by_region.csv`, and three figure
+scripts. And the deposit's own documentation was corrected against the archives:
+most consequentially, a licence note that denied redistributing three
+NonCommercial-restricted raster sets the record does in fact redistribute.
 
 Version DOI <https://doi.org/10.5281/zenodo.22718970> —
 concept DOI <https://doi.org/10.5281/zenodo.21745158>.
@@ -69,6 +71,43 @@ Section 5.5 are produced by `main/trend_regions.py`, which exists only from
   that error reached the submitted paper. The attribution requirement it existed
   to record now lives in `figures/README.md`; the duplicated caption text is
   gone.
+
+### Fixed
+
+Documentation errors found by auditing the deposit against the archives
+themselves rather than against the previous README.
+
+- **The licence note denied a redistribution that is happening.**
+  `DATA_README.md` stated that "no MERIT, HWSD or C3S raster is redistributed
+  here". All three are: `inputs_static_covariates.zip` carries MERIT Hydro
+  (`upa_log.tif`, `hnd.tif`), HWSD v2 (`awc.tif`, `root_depth.tif`) and the ESA
+  C3S land cover (`crop_irrigated_*.tif`, `crop_rainfed_*.tif`), each under its
+  own provider's terms rather than this record's CC-BY-4.0. That sentence was the
+  one a NonCommercial-restricted user would have relied on. The true half of the
+  claim is kept: none of their values can be recovered from the released
+  products.
+- **The third-party archives were misnamed in both directions.** `DATA_README.md`
+  pointed at `inputs_raw_gee.zip` and `inputs_cgwb_wells.zip`; the first holds
+  only ERA5-Land (CC-BY-4.0) and GRACE (public domain), and the second is
+  CC-BY-4.0 and compatible with the record. Naming the raw archive encumbered
+  5.97 GB with terms it does not carry, while the archive that does carry them
+  went unnamed.
+- **`Data/README.md` recorded the GLOBGM and CGWB licences as "not established"**
+  and instructed that they be settled before publication — shipping inside the
+  source archive, contradicting what the record itself asserts. Both now agree
+  with `DATA_README.md`.
+- **Deposit manifest.** The file counts for `evaluation_tables.zip` (23 → 24) and
+  `figures.zip` (22 → 30) were stale for exactly the two archives this release
+  rebuilds; `grace-grb-1.0.1.zip` and `trend_by_region.csv` had no manifest row
+  at all; and a `covariate_gate_<model>.csv` row named a file that exists neither
+  in the archive nor in the repository.
+- **Dead pointers and pre-publication language** removed from `DATA_README.md`: a
+  `TODO.md` reference to a file that ships in neither the deposit nor the source
+  archive, and an instruction about settling licences "before this record is
+  published", which does not belong on a permanent archive.
+- `README.md` gained the four scripts this release adds, which its file tree had
+  never listed, and six stale figure sizes in `figures/README.md` were corrected
+  against the files on disk.
 
 ---
 
