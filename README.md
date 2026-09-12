@@ -167,10 +167,10 @@ grace-grb/
 │   ├── make_fig2_workflow.py
 │   ├── make_fig3_holdouts.py           # Fig. 3: what each temporal holdout withholds
 │   ├── make_fig10_trend_regions.py     # Fig. 10: trend field and its regional structure
-│   ├── make_figS5_lomo_metrics.py      # Fig. S5: leave-one-mascon-out skill per metric
+│   ├── make_fig5_lomo_metrics.py       # Fig. 5: leave-one-mascon-out skill per metric
 │   ├── make_graphical_abstract.py      # Graphical abstract, 2.5:1 for Elsevier; checks its own layout
 │   ├── data/                           # Generated: ~845 MB of basemaps, gitignored
-│   └── output/                         # Fig1, Fig2, Fig3, Fig10, FigS5, graphical abstract (PDF + PNG)
+│   └── output/                         # Fig1, Fig2, Fig3, Fig5, Fig10, graphical abstract (PDF + PNG)
 ├── gee/                                # Earth Engine explorer app — public, no account needed
 │   ├── README.md
 │   └── twsa_explorer.js

@@ -34,7 +34,7 @@ reproduces the stored value before it trusts the bias.
 
 USAGE
 -----
-    python make_figS5_lomo_metrics.py
+    python make_fig5_lomo_metrics.py
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ sys.path.insert(0, os.path.join(REPO, 'main'))
 import plot_style as ps                                        # noqa: E402
 
 OUT = os.path.join(HERE, 'output')
-STEM = 'FigS5_lomo_metrics'
+STEM = 'Fig5_lomo_metrics'
 RESULTS = os.path.join(REPO, 'Results', 'downscaling')
 BASIN = os.path.join(REPO, 'Data', 'Ganga Basin Shapefile', 'Ganga_basin.shp')
 
@@ -69,10 +69,15 @@ INK, MUTED, GRID = ps.SCI_INK, ps.SCI_MUTED, ps.SCI_GRID
 # gradient among the folds that are usable, and the arrow on the bar marks the
 # ones that run past it. An NSE below zero already means "worse than predicting
 # the mean", so nothing interpretable is lost below the cut.
+# Palette follows main/generate_gridded_maps.py: `Purples` for magnitudes,
+# `RdBu` for signed fields. RMSE is reversed so that DARKER MEANS BETTER in all
+# three skill panels, which is how the single-panel R2 map this figure replaces
+# was read; mean bias error is signed and so keeps a diverging scale with a
+# neutral midpoint at zero.
 PANELS = [
-    ('RMSE', 'RMSE (mm)', 'viridis_r', False, None),
-    ('R2', r'$\mathrm{R}^{2}$', 'viridis', False, None),
-    ('NSE', 'NSE', 'viridis', False, (-1.0, 1.0)),
+    ('RMSE', 'RMSE (mm)', 'Purples_r', False, None),
+    ('R2', r'$\mathbf{R^{2}}$', 'Purples', False, None),   # \mathbf: mathtext ignores fontweight
+    ('NSE', 'NSE', 'Purples', False, (-1.0, 1.0)),
     ('MBE', 'Mean bias error (mm)', 'RdBu_r', True, None),
 ]
 
@@ -138,7 +143,7 @@ def build(metrics: pd.DataFrame):
     gdf = basin_outline()
 
     fig, axes = plt.subplots(2, 2, figsize=(7.4, 5.2))
-    for ax, (col, title, cmap, signed, clip) in zip(axes.ravel(), PANELS):
+    for _k, (ax, (col, title, cmap, signed, clip)) in enumerate(zip(axes.ravel(), PANELS)):
         shape = (len(lat), len(lon))
         f = fields[col].reshape(shape)
         shown = f[::-1] if lat[0] < lat[-1] else f
@@ -164,20 +169,21 @@ def build(metrics: pd.DataFrame):
         ax.set_xticks([]); ax.set_yticks([])
         for sp in ax.spines.values():
             sp.set_color(GRID)
-        ax.set_title(title, fontsize=8.4, fontweight='bold', color=INK,
+        # Panels are lettered (a)-(d) so the caption and the text can point at one,
+        # matching the well maps of Fig. 7.
+        ax.set_title(f'({chr(ord("a") + _k)}) {title}', fontsize=8.4, fontweight='bold', color=INK,
                      loc='left', pad=4)
         cb = fig.colorbar(im, ax=ax, fraction=0.031, pad=0.015, extend=extend)
         cb.ax.tick_params(labelsize=7.0, length=2, color=MUTED, labelcolor=INK)
         cb.outline.set_visible(False)
 
-    fig.suptitle('Leave-one-mascon-out skill by mascon, all 19 folds',
-                 fontsize=9.4, fontweight='bold', color=INK, y=0.985)
-    fig.text(0.5, 0.012,
-             'Each patch is one GRACE mascon, coloured by the score a model '
-             'achieved there when that mascon and its neighbours were withheld '
-             'from training.',
-             fontsize=7.0, color=MUTED, ha='center')
-    fig.tight_layout(rect=(0, 0.03, 1, 0.97))
+    # No title on the plate: the manuscript caption carries it, and a title that
+
+    # repeats the caption is one more thing that can drift out of step with it.
+    # No footnote either: it said the same thing as the caption, word for word.
+    # Full canvas: the 3% reserved top and bottom held the suptitle and the
+    # footnote, and both are gone.
+    fig.tight_layout(rect=(0, 0, 1, 1))
     return fig
 
 

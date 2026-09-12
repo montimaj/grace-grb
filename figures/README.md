@@ -135,7 +135,7 @@ re-derived here. That is not tidiness: an earlier version computed its own masks
 and silently disagreed with the summary table by 40 pixels, because one used
 half-open bounds and the other inclusive ones.
 
-### Supplementary Figure S5 — leave-one-mascon-out metrics (`make_figS5_lomo_metrics.py`)
+### Figure 5 — leave-one-mascon-out metrics (`make_fig5_lomo_metrics.py`)
 
 RMSE, R², NSE and mean bias error for all 19 cross-validation folds, each patch
 one GRACE mascon coloured by the score a model achieved there when that mascon
@@ -248,8 +248,8 @@ the reason the content is four panels rather than six.
 | `output/Fig3_holdouts.png` | 322 KB | 600 dpi |
 | `output/Fig10_trend_regions.pdf` | 180 KB | 188 mm wide |
 | `output/Fig10_trend_regions.png` | 817 KB | 600 dpi |
-| `output/FigS5_lomo_metrics.pdf` | 351 KB | 185 mm wide |
-| `output/FigS5_lomo_metrics.png` | 735 KB | 600 dpi |
+| `output/Fig5_lomo_metrics.pdf` | 339 KB | 185 mm wide |
+| `output/Fig5_lomo_metrics.png` | 657 KB | 600 dpi |
 | `output/Graphical_Abstract.pdf` | 315 KB | 11 × 4.4 in, Arial only |
 | `output/Graphical_Abstract.png` | 503 KB | 3300 × 1320 px at 300 dpi — **this is the file to submit** |
 | `output/Graphical_Abstract_preview_500x200.png` | 75 KB | gitignored; legibility proof, not for submission |
@@ -277,7 +277,7 @@ python figures/make_fig2_workflow.py
 python figures/make_graphical_abstract.py
 python figures/make_fig3_holdouts.py        # Fig. 3
 python figures/make_fig10_trend_regions.py  # Fig. 10
-python figures/make_figS5_lomo_metrics.py   # Supplementary Fig. S5
+python figures/make_fig5_lomo_metrics.py    # Fig. 5
 ```
 
 Figures 3, 10 and S5 read results rather than downloads, so they run only after
@@ -287,7 +287,7 @@ Figures 3, 10 and S5 read results rather than downloads, so they run only after
 number: `make_fig3_holdouts.py` re-runs the seeded month selection from
 `downscale_holdouts.py` against the released observation flag, and
 `make_fig10_trend_regions.py` calls `trend_regions.summarise()` and
-`region_mask()` directly, and `make_figS5_lomo_metrics.py` checks its recomputed
+`region_mask()` directly, and `make_fig5_lomo_metrics.py` checks its recomputed
 bias against the stored RMSE before drawing, so the figures, Supplementary Table
 S9 and the manuscript cannot disagree.
 

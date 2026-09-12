@@ -47,7 +47,7 @@ Section 5.5 are produced by `main/trend_regions.py`, which exists only from
   the blocked experiment covers the GRACE/GRACE-FO mission gap. It does not, and
   cannot; the figure shows why.
 - **`figures/make_fig10_trend_regions.py`** (Fig. 10) and
-  **`figures/make_figS5_lomo_metrics.py`** (Fig. S5). Fig. 10 takes its region
+  **`figures/make_fig5_lomo_metrics.py`** (Fig. 5). Fig. 10 takes its region
   masks from `trend_regions.region_mask()` rather than recomputing them, after
   an earlier version disagreed with the table by 40 pixels.
 
