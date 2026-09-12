@@ -1,7 +1,8 @@
 # Methods
 
 **Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal
-Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin**
+Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River
+Basin**
 
 From ~3° monthly GRACE mascons to a **0.1° (~10 km) daily** product spanning
 2000–2025.

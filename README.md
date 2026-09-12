@@ -1,4 +1,4 @@
-# Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin
+# Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River Basin
 
 > **On "Ganga" and "Ganges".** They are the same river. The manuscript title, the
 > figure plates and the abstract use **Ganges**, the exonym the journal's
@@ -20,7 +20,7 @@ the significance-masked trend. Source in [`gee/`](gee/).
 
 ### The paper
 
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River Basin. _Under review in Groundwater for Sustainable Development._
 
 ### The data and code
 
@@ -174,9 +174,9 @@ grace-grb/
 ├── gee/                                # Earth Engine explorer app — public, no account needed
 │   ├── README.md
 │   └── twsa_explorer.js
-├── paper/                              # Manuscript, reviewer materials, response letter
-│   ├── README.md
-│   └── spatial/                        # The LIVE revision materials
+├── paper/                              # Manuscript and reviewer materials — GITIGNORED, not in the repo
+│   ├── README.md                       #   an inventory of what is live and what is superseded
+│   └── FInal/R2/                       #   the revision currently with the journal
 ├── CITATION.cff                        # Citation and Zenodo deposit metadata
 ├── DATA_README.md                      # README for the separate Zenodo DATA record
 ├── CHANGELOG.md                        # What this replaced and why; the superseded abstract

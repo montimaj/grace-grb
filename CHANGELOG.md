@@ -30,6 +30,12 @@ The R2 manuscript cites this release, not 1.0.0: the regional trend figures in
 Section 5.5 are produced by `main/trend_regions.py`, which exists only from
 1.0.1, so a reader who fetched 1.0.0 would not find the script that made them.
 
+### Changed
+
+- **Manuscript title**, which gained *Anomalies*: "... Disaggregation of GRACE
+  Terrestrial Water Storage **Anomalies** over the Ganges River Basin". TWSA is
+  the quantity the model actually produces, and the title now says so.
+
 ### Added
 
 - **`main/trend_regions.py`.** The manuscript quoted a mean trend for "the

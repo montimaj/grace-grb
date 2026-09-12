@@ -1,7 +1,8 @@
 # `main/` — module reference
 
 **Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal
-Disaggregation of GRACE Terrestrial Water Storage over the Ganges River Basin**
+Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River
+Basin**
 
 ![Graphical abstract](../figures/output/Graphical_Abstract.png)
 
@@ -393,6 +394,6 @@ model that tuning had made *worse* appeared as a negative number.
 
 Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
 Thakur, P. K. (2026). *Explainable AI-Based Spatial Downscaling and Water
-Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage over
-the Ganges River Basin.* Under review, **Groundwater for Sustainable
+Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage
+Anomalies over the Ganges River Basin.* Under review, **Groundwater for Sustainable
 Development**.
