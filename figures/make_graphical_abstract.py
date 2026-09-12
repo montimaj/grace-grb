@@ -65,7 +65,6 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt                                    # noqa: E402
 import numpy as np                                                 # noqa: E402
 import pandas as pd                                                # noqa: E402
-from matplotlib.patches import FancyArrowPatch                     # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -118,9 +117,9 @@ xA = 0.318                                    # left map column
 CW = 0.009                                    # colourbar width
 BAR_PAD = 0.013                               # map edge -> colourbar
 BAR_SLOT = 0.061                              # colourbar + its ticks + its label
-ARROW_SLOT = 0.036
+COL_GAP = 0.036      # gutter between the two map columns
 xBar1 = xA + W + BAR_PAD                      # right of the FIRST map
-xB = xA + W + BAR_SLOT + ARROW_SLOT           # right map column
+xB = xA + W + BAR_SLOT + COL_GAP           # right map column
 xBar2 = xB + W + BAR_PAD                      # right of the second column
 
 
@@ -292,14 +291,12 @@ def build(d, out_stem):
     vbar(ims, xBar1, yBot, 'σ$_{total}$ (mm)', 'max')
     vbar(sc, xBar2, yBot, 'well bias (mm)', 'both')
 
-    # Drawn, not typed: '→' at 24 pt depends on the glyph being in Arial, and
-    # an arrow is one of the few things here that must never fall back to a
-    # substitute font.
-    ax0, ay = xA + W + BAR_SLOT, yTop + HGT * 0.5
-    fig.add_artist(FancyArrowPatch(
-        (ax0 + 0.004, ay), (ax0 + ARROW_SLOT - 0.004, ay),
-        transform=fig.transFigure, arrowstyle='-|>', mutation_scale=13,
-        linewidth=1.6, color=INK, shrinkA=0, shrinkB=0))
+    # There was an arrow here, pointing from the mascon map to the downscaled
+    # one. It is gone: the panel titles ("GRACE sees, 19 mascons, 3 deg" and
+    # "We produce, 9,538 cells, 0.1 deg") and the headline already give the
+    # direction, reading order gives it again, and the arrow's tail sat on the
+    # left colourbar's "TWSA (mm)" label. The slot it occupied stays as the
+    # gutter between the two map columns, so no other geometry moves.
 
     for ext_ in ('png', 'pdf'):
         path = f'{out_stem}.{ext_}'
@@ -347,6 +344,12 @@ def check_layout(fig, tol=1.0):
     fig.canvas.draw()
     r = fig.canvas.get_renderer()
     boxes = []
+
+    # fig.artists holds anything added with fig.add_artist(). It was not
+    # measured here before, which is how an overlapping arrow shipped through a
+    # check that claims nothing may overlap.
+    for i, a in enumerate(fig.artists):
+        boxes.append((f'artist[{i}] {type(a).__name__}', a.get_window_extent(r)))
 
     for i, t in enumerate(fig.texts):
         label = (t.get_text().splitlines() or [''])[0][:34]
