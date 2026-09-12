@@ -28,9 +28,9 @@ Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
 Thakur, P. K. (2026). _Downscaled GRACE terrestrial water storage anomalies
 for the Ganga (Ganges) River Basin at 0.1°: Monthly and daily fields with
 per-pixel uncertainty, 2000–2025_ [Data set]. Zenodo.
-https://doi.org/10.5281/zenodo.21745159
+https://doi.org/10.5281/zenodo.22718970
 
-> **That is the VERSION DOI for v1.0.0**, which is what a paper should cite: it
+> **That is the VERSION DOI for v1.0.1**, which is what a paper should cite: it
 > pins the exact artefact rather than whatever was released last. **All
 > versions:** https://doi.org/10.5281/zenodo.21745158 — the concept DOI, which
 > always resolves to the most recent release. Code and data ship as **one
@@ -154,6 +154,7 @@ grace-grb/
 │   ├── downscale_annual_cycle.py       # Annual cycle scored out-of-fold, where scoring is possible
 │   ├── downscale_covariate_gate.py     # Standalone covariate diagnostic (no longer selects)
 │   ├── generate_gridded_maps.py        # Per-pixel maps from the gridded product
+│   ├── trend_regions.py                # Regional trend summaries; defines the four quadrants
 │   ├── wells_ingest.py                 # CGWB well ingest (validation set)
 │   ├── validate_wells.py               # Independent validation vs wells, in mm
 │   ├── validate_wells_scales.py        # Well comparison at three aggregation scales
@@ -164,17 +165,19 @@ grace-grb/
 │   ├── fetch_data.py                   # Re-downloads the basemaps; refuses a non-SOI boundary
 │   ├── make_fig1_study_area.py
 │   ├── make_fig2_workflow.py
+│   ├── make_fig3_holdouts.py           # Fig. 3: what each temporal holdout withholds
+│   ├── make_fig10_trend_regions.py     # Fig. 10: trend field and its regional structure
+│   ├── make_figS5_lomo_metrics.py      # Fig. S5: leave-one-mascon-out skill per metric
 │   ├── make_graphical_abstract.py      # Graphical abstract, 2.5:1 for Elsevier; checks its own layout
 │   ├── data/                           # Generated: ~845 MB of basemaps, gitignored
-│   └── output/                         # Fig1, Fig2, graphical abstract (PDF + PNG) + FIGURE_CAPTIONS.md
+│   └── output/                         # Fig1, Fig2, Fig3, Fig10, FigS5, graphical abstract (PDF + PNG)
 ├── gee/                                # Earth Engine explorer app — public, no account needed
 │   ├── README.md
 │   └── twsa_explorer.js
 ├── paper/                              # Manuscript, reviewer materials, response letter
 │   ├── README.md
 │   └── spatial/                        # The LIVE revision materials
-├── CITATION.cff                        # Citation metadata for the code record
-├── .zenodo.json                        # Zenodo deposit metadata (OVERRIDES CITATION.cff)
+├── CITATION.cff                        # Citation and Zenodo deposit metadata
 ├── DATA_README.md                      # README for the separate Zenodo DATA record
 ├── CHANGELOG.md                        # What this replaced and why; the superseded abstract
 └── METHODS.md                          # The scientific method: what is fitted, what is not

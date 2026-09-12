@@ -755,9 +755,9 @@ left.add(note('A 0.1° daily disaggregation exists (9,497 days). It is NOT ' +
 
 // --- provenance ----------------------------------------------------------
 left.add(heading('Source', '13px'));
-left.add(ui.Label('Data record (Zenodo, v1.0.0)',
+left.add(ui.Label('Data record (Zenodo, v1.0.1)',
                   {fontSize: '11px', margin: '1px 0'},
-                  'https://doi.org/10.5281/zenodo.21745159'));
+                  'https://doi.org/10.5281/zenodo.22718970'));
 left.add(ui.Label('Code and methods (GitHub)',
                   {fontSize: '11px', margin: '1px 0'},
                   'https://github.com/montimaj/grace-grb'));

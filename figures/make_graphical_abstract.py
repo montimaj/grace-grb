@@ -178,9 +178,9 @@ def _frame(ax, title, subtitle):
     # One line, not a title plus a subtitle underneath. The subtitle sat in the
     # gap between a map and the colourbar below it, which is exactly where a
     # horizontal bar wants to be -- they collided at every size tried.
-    ax.set_title(title, fontsize=10.5, fontweight='bold', color=INK,
+    ax.set_title(title, fontsize=12, fontweight='bold', color=INK,
                  loc='left', pad=4)
-    ax.set_title(subtitle, fontsize=8.8, color=MUTED, loc='right', pad=4)
+    ax.set_title(subtitle, fontsize=10, color=MUTED, loc='right', pad=4)
 
 
 def _map(ax, field, grid, basin, title, subtitle, vmin, vmax,
@@ -214,48 +214,36 @@ def build(d, out_stem):
     # ---- left: the claim and the numbers -----------------------------------
     # Two lines, not one. On a 2.5:1 canvas a single-line headline at a size
     # worth reading is wider than the column and runs under the first map.
-    fig.text(TEXT_L, 0.960, 'GRACE water storage,\ndownscaled to 0.1°',
-             fontsize=20, fontweight='bold', color=INK, va='top',
+    fig.text(TEXT_L, 0.960, 'GRACE TWSA,\ndownscaled to 0.1°',
+             fontsize=25, fontweight='bold', color=INK, va='top',
              linespacing=1.15)
     # "Ganges", not "Ganga", in the one figure ScienceDirect renders directly
     # under the paper title. Everywhere the plate is not sitting next to that
     # title the repository uses the official "Ganga"; see the note in README.md.
-    fig.text(TEXT_L, 0.775, 'Ganges basin  ·  2000–2025  ·  monthly and daily',
-             fontsize=10.2, color=MUTED, va='top')
-    fig.text(TEXT_L, 0.700,
-             f'{d["n_mascons"]} GRACE mascons → {d["n_cells"]:,} cells, every\n'
-             'mascon mean reproduced exactly, with\n'
-             'per-pixel uncertainty published.',
-             fontsize=10.2, color=INK, va='top', linespacing=1.45)
+    fig.text(TEXT_L, 0.760, 'Ganges basin · 2000–2025',
+             fontsize=13, color=MUTED, va='top')
     # The maps are one month, and the figure used to say nowhere which one.
-    fig.text(TEXT_L, 0.540,
-             f'Maps: {pd.Timestamp(d["month"]).strftime("%B %Y")}, '
-             f'a GRACE-observed month',
-             fontsize=9.4, color=MUTED, va='top')
+    fig.text(TEXT_L, 0.640,
+             f'Maps: {pd.Timestamp(d["month"]).strftime("%B %Y")}',
+             fontsize=12, color=MUTED, va='top')
 
-    facts = [('%.0f mm' % cv['RMSE'], 'held out in SPACE', 'leave-one-mascon-out'),
-             ('%.0f mm' % h.loc['forward', 'RMSE_mean'], 'held out in TIME',
-              'out-of-record'),
-             ('r %.2f' % basin_row.downscaled_r, 'vs WELLS',
-              'independent; bilinear %.2f' % basin_row.bilinear_r),
-             ('%.0f%%' % pct, 'NOT observed', 'months reconstructed')]
-    for i, (val, head, sub) in enumerate(facts):
-        y = 0.455 - i * 0.095
-        fig.text(TEXT_L, y, val, fontsize=15.5, fontweight='bold', color=INK,
+    facts = [('%.0f mm' % cv['RMSE'], 'held out in SPACE'),
+             ('%.0f mm' % h.loc['forward', 'RMSE_mean'], 'held out in TIME'),
+             ('r %.2f' % basin_row.downscaled_r, 'vs WELLS'),
+             ('%.0f%%' % pct, 'RECONSTRUCTED')]
+    for i, (val, head) in enumerate(facts):
+        y = 0.500 - i * 0.100
+        fig.text(TEXT_L, y, val, fontsize=20, fontweight='bold', color=INK,
                  va='center')
-        fig.text(FACT_X, y + 0.021, head.upper(), fontsize=9.0, color=MUTED,
+        fig.text(FACT_X, y, head.upper(), fontsize=13, color=MUTED,
                  fontweight='bold', va='center')
-        fig.text(FACT_X, y - 0.022, sub, fontsize=9.0, color=MUTED,
-                 va='center')
 
     # Full width, and below every map: the only strip of the canvas where a
     # sentence this long does not have to be broken into six lines.
     fig.text(TEXT_L, 0.022,
-             'Mascon-scale agreement is imposed by mass conservation and is '
-             'therefore not evidence of skill; every number above is held out.\n'
-             'Fine structure is inferred from ERA5-Land covariates, not '
-             'observed. Red is water lost, blue is water gained.',
-             fontsize=8.6, color=MUTED, va='bottom', linespacing=1.45)
+             'Mascon means are conserved by construction, so every number shown '
+             'is held out; fine structure is inferred, not observed.',
+             fontsize=12, color=MUTED, va='bottom', linespacing=1.45)
 
     # ---- right: 2 x 2 maps, VERTICAL colourbars ----------------------------
     # Vertical rather than horizontal. A horizontal bar has to live in the gap
@@ -268,9 +256,9 @@ def build(d, out_stem):
     axD = fig.add_axes([xB, yBot, W, HGT])
 
     imA = _map(axA, d['coarse'], d['grids']['grace'], d['basin'],
-               'What GRACE sees', f'{d["n_mascons"]} mascons, 3°', -vmax, vmax)
+               'GRACE sees', f'{d["n_mascons"]} mascons, 3°', -vmax, vmax)
     imB = _map(axB, d['fine'], d['grids']['era5'], d['basin'],
-               'What we produce', f'{d["n_cells"]:,} cells, 0.1°', -vmax, vmax)
+               'We produce', f'{d["n_cells"]:,} cells, 0.1°', -vmax, vmax)
     ims = _map(axC, d['sigma'], d['grids']['era5'], d['basin'],
                'How uncertain', 'per-pixel σ', 0, smax, cmap='Purples')
 
@@ -280,7 +268,7 @@ def build(d, out_stem):
     sc = axD.scatter(pw.lon, pw.lat, c=pw.MBE, cmap='RdBu_r', vmin=-mmax,
                      vmax=mmax, s=2.2, edgecolor='none', zorder=3)
     axD.set_aspect(axC.get_aspect())
-    _frame(axD, 'Checked against wells', f'{d["n_wells"]:,} wells')
+    _frame(axD, 'Checked', f'{d["n_wells"]:,} wells')
 
     def vbar(mappable, x, y, label, extend):
         cax = fig.add_axes([x, y, CW, HGT])
@@ -290,8 +278,8 @@ def build(d, out_stem):
         # Short labels only. A rotated label longer than the bar it names
         # overhangs the panel above and below it; the sign convention lives in
         # the footnote instead, where it has a whole line to itself.
-        cb.set_label(label, fontsize=8.8, labelpad=2)
-        cb.ax.tick_params(labelsize=8.0, length=2, pad=1.5)
+        cb.set_label(label, fontsize=11, labelpad=2)
+        cb.ax.tick_params(labelsize=10, length=2, pad=1.5)
         return cb
 
     # Every panel gets its own bar, immediately to its right, and the layout is

@@ -14,6 +14,61 @@ Versions track the Zenodo record. The scientific method of record is
 
 ---
 
+## [1.0.1] — 2026-09-11
+
+Changes made while answering the second round of review for *Groundwater for
+Sustainable Development*. No value in the product changed: the 0.1° monthly and
+daily fields, the model and the uncertainty components are bit-for-bit those of
+1.0.0. What changed is that numbers quoted in the paper became reproducible —
+which added one result file, `Results/downscaling/trend_by_region.csv`, and three
+figure scripts.
+
+Version DOI <https://doi.org/10.5281/zenodo.22718970> —
+concept DOI <https://doi.org/10.5281/zenodo.21745158>.
+
+The R2 manuscript cites this release, not 1.0.0: the regional trend figures in
+Section 5.5 are produced by `main/trend_regions.py`, which exists only from
+1.0.1, so a reader who fetched 1.0.0 would not find the script that made them.
+
+### Added
+
+- **`main/trend_regions.py`.** The manuscript quoted a mean trend for "the
+  Punjab–Haryana–western Uttar Pradesh plain" that no committed mask defined, so
+  a reader holding the archived trend field could not reproduce it. The basin is
+  now split at 27°N and 79.5°E into four quadrants, written down in one place,
+  and `main()` asserts the partition — every one of the 9,538 tested cells falls
+  in exactly one quadrant — before writing
+  `Results/downscaling/trend_by_region.csv`. The text now quotes that file.
+- **`figures/make_fig3_holdouts.py`** (Fig. 3), which re-runs the seeded month
+  selection from `downscale_holdouts.py` and draws all three holdout designs
+  against the observation record, answering a reviewer question about whether
+  the blocked experiment covers the GRACE/GRACE-FO mission gap. It does not, and
+  cannot; the figure shows why.
+- **`figures/make_fig10_trend_regions.py`** (Fig. 10) and
+  **`figures/make_figS5_lomo_metrics.py`** (Fig. S5). Fig. 10 takes its region
+  masks from `trend_regions.region_mask()` rather than recomputing them, after
+  an earlier version disagreed with the table by 40 pixels.
+
+### Changed
+
+- Fig. 10 replaces the former trend map, carrying the same field with the
+  quadrant boundaries drawn on it and a second panel showing the distribution of
+  trends within each region.
+- `figures/README.md` now states the Figure 1 attribution requirement directly,
+  in place of the removed caption file.
+
+### Removed
+
+- **`.zenodo.json`.** It silently overrode `CITATION.cff`, which is now the only
+  deposit metadata.
+- **`figures/output/FIGURE_CAPTIONS.md`.** A second copy of the captions that
+  drifted from the manuscript: it described Figure 2's colour key backwards, and
+  that error reached the submitted paper. The attribution requirement it existed
+  to record now lives in `figures/README.md`; the duplicated caption text is
+  gone.
+
+---
+
 ## [1.0.0] — 2026-08-01
 
 Rebuilt as **spatial downscaling plus water-balance-guided temporal
@@ -40,7 +95,7 @@ concept DOI <https://doi.org/10.5281/zenodo.21745158>.
   scales, reported as scale-dependent rather than as a single pooled number.
 - **Earth Engine explorer** ([`gee/`](gee/)) — the product in a browser, no
   account required.
-- **Archive metadata**: `CITATION.cff`, `.zenodo.json`, `DATA_README.md`.
+- **Archive metadata**: `CITATION.cff`, `DATA_README.md`.
 - **`environment.yml`** — the pinned versions every result was produced under.
 - **New figures**: study area, method workflow, and a graphical abstract built
   from the product rather than drawn around it.

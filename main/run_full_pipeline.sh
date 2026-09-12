@@ -387,6 +387,10 @@ require python downscale_daily.py
 # first-round reviewers saw.
 run python downscale_holdouts.py --model "$GRIDDED_MODEL"
 run python generate_gridded_maps.py --model "$GRIDDED_MODEL"  # per-pixel climatology, seasonal, trend, uncertainty
+# Regional means of that trend field. Exists so the north-west depletion figure
+# quoted in the paper has a committed region definition behind it instead of a
+# box that lived only in an author's head.
+run python trend_regions.py
 
 # Annual cycle of the basin, scored on LEAVE-ONE-MASCON-OUT predictions rather
 # than on the published field. The product's basin mean is pinned to GRACE by

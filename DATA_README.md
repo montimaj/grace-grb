@@ -387,10 +387,10 @@ licence arm is elected above.
 > Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
 > Thakur, P. K. (2026). *Downscaled GRACE terrestrial water storage
 > anomalies for the Ganga (Ganges) River Basin at 0.1°: Monthly and daily fields
-> with per-pixel uncertainty, 2000–2025* (Version 1.0.0) [Data set].
-> Zenodo. <https://doi.org/10.5281/zenodo.21745159>
+> with per-pixel uncertainty, 2000–2025* (Version 1.0.1) [Data set].
+> Zenodo. <https://doi.org/10.5281/zenodo.22718970>
 
-Cite the **version** DOI above: it pins v1.0.0, the exact artefact these files
+Cite the **version** DOI above: it pins v1.0.1, the exact artefact these files
 belong to. **All versions:** <https://doi.org/10.5281/zenodo.21745158> — the concept DOI,
 which always resolves to the most recent release.
 
@@ -402,8 +402,9 @@ product with its own terms, this row is the one to revisit — and the safe
 substitute is already available, since every number in this release comes from
 the rasterised `basin_frac` mask rather than from the polygon itself.
 
-Code and data ship as one record, so there is no separate code DOI. Associated
-paper: TODO-PAPER-DOI.
+Code and data ship as one record, so there is no separate code DOI. The
+associated paper is under review at *Groundwater for Sustainable Development*;
+its DOI will be added to this record on acceptance.
 
 ---
 

@@ -1,34 +1,28 @@
-# Citation metadata for the CODE in this repository.
+# Citation metadata for this repository.
 #
-# The data products are a SEPARATE Zenodo record with its own DOI and its own
-# licence -- see DATA_README.md. One record carries one licence, and the data
-# licence cannot be GPL (DATA_README.md, "Licence").
+# THIS FILE IS THE ONLY DEPOSIT METADATA. `.zenodo.json` used to override it --
+# Zenodo reads that file alone whenever it exists and never merges the two --
+# and it has been removed, so there is one source of truth here rather than two
+# that had to be kept in step by hand. This file also drives GitHub's "Cite
+# this repository" button.
 #
-# THIS FILE IS IGNORED BY ZENODO WHENEVER .zenodo.json IS PRESENT. Zenodo does
-# not merge the two: if .zenodo.json exists it builds the record from that file
-# alone and never reads this one. This file drives GitHub's "Cite this
-# repository" button and nothing else, so the two must be kept in step by hand.
+# SINGLE COMBINED RECORD: the code and the data products ship together under
+# one DOI. A Zenodo record carries one licence field, so CC-BY-4.0 below
+# describes the DATA and the bundled source code stays GPL-3.0-only under its
+# own LICENSE; the carve-out is stated in the abstract. Inputs redistributed
+# inside the record keep their providers' terms -- see DATA_README.md.
 #
-# BEFORE TAGGING A RELEASE, replace every TODO- token here AND in .zenodo.json:
-#   grep -rn 'TODO-' CITATION.cff .zenodo.json DATA_README.md README.md Data/README.md Results/README.md
-# The GitHub-Zenodo integration publishes on release, and a published Zenodo
-# record cannot be deleted -- only a new version can be added on top of it.
-#
-# Outstanding, and NOT guessable from anything in this repository:
-#   TODO-AUTHOR-*        author list, in manuscript order
-#   TODO-ORCID-*         ORCIDs (schema requires the full https://orcid.org/ URL)
-#   TODO-AFFILIATION-*   affiliations
-#   TODO-VERSION         git tag; no tags exist yet (`git tag -l` is empty)
-#   TODO-RELEASE-DATE    date-released, added at tag time
-#   (the concept DOI is now known: 10.5281/zenodo.21745158, set under `identifiers` below)
-# README.md's citation block names six authors for the manuscript. It is a
-# starting point, not authority: the deposit must match the accepted paper.
+# BEFORE TAGGING A NEW RELEASE, check every field below. The GitHub-Zenodo
+# integration publishes on release, and a published Zenodo record cannot be
+# deleted -- only a new version can be added on top of it.
 
 cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
 title: >-
   Downscaled GRACE terrestrial water storage anomalies for the Ganga (Ganges) River Basin at 0.1°: Monthly and daily fields with per-pixel uncertainty, 2000–2025
-type: software
+# `dataset`, not `software`: the record is cited in the manuscript as a data
+# set and the deposit it replaces declared the same. The code ships inside it.
+type: dataset
 
 authors:
   - family-names: Kaushik
@@ -59,7 +53,7 @@ authors:
   # against its ISO 7064 MOD 11-2 check digit before being written here.
 
 abstract: >-
-  Code for a 0.1 degree monthly and daily terrestrial water storage anomaly
+  A 0.1 degree monthly and daily terrestrial water storage anomaly
   (TWSA) product over the Ganga (Ganges) river basin, 2000-2025. GRACE and
   GRACE-FO JPL RL06 mascons are spatially downscaled by fitting a
   predictor-TWSA relation across mascons with tree ensembles, and every
@@ -74,10 +68,8 @@ abstract: >-
   leave-one-mascon-out cross-validation over 19 mascons and a comparison
   against 656 quality-controlled CGWB dug wells.
 
-version: 1.0.0
-date-released: 2026-08-01
-#   Left absent rather than stubbed: the schema requires a real date here, so a
-#   placeholder string would fail validation outright.
+version: 1.0.1
+date-released: 2026-09-11
 license: CC-BY-4.0
 # The record bundles code and data. CC-BY-4.0 describes the DATA; the source
 # code in the same archive stays GPL-3.0-only under its own LICENSE file.
@@ -91,15 +83,16 @@ license: CC-BY-4.0
 repository-code: "https://github.com/montimaj/grace-grb"
 url: "https://github.com/montimaj/grace-grb"
 
-# The VERSION DOI is what a paper should cite: it pins v1.0.0 rather than
-# whatever was released last. The concept DOI is the "all versions" line and is
-# listed second.
-doi: 10.5281/zenodo.21745159
+# The VERSION DOI is what a paper should cite: it pins v1.0.1 rather than
+# whatever was deposited last. The concept DOI is the "all versions" line and is
+# listed second. v1.0.0's version DOI is not repeated here; CHANGELOG.md records
+# it under [1.0.0].
+doi: 10.5281/zenodo.22718970
 
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.21745159
-    description: Version DOI for v1.0.0 - cite this one
+    value: 10.5281/zenodo.22718970
+    description: Version DOI for v1.0.1 - cite this one
   - type: doi
     value: 10.5281/zenodo.21745158
     description: Concept DOI, resolving to the latest version of this record

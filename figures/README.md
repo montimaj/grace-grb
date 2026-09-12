@@ -101,6 +101,64 @@ column count. The design matrix changed twice during the revision; the numbers
 belong in METHODS.md and the released ablation table, where a reader can check
 them against something.
 
+### Figure 3 — temporal holdout design (`make_fig3_holdouts.py`)
+
+The GRACE/GRACE-FO observation record and the three temporal validation designs
+drawn against one axis. It exists because a reviewer asked which months each
+scheme withholds, and in particular whether the blocked experiment covers the
+GRACE/GRACE-FO mission gap. It cannot, and the figure shows why: a month must
+carry an observation before it can be withheld and scored, the gap contains
+none, and the blocked blocks therefore straddle it rather than cover it.
+
+The months are not transcribed from the paper. The script re-runs the same
+seeded selection as `main/downscale_holdouts.py` against the `grace_observed`
+flag in the released product, so the figure cannot drift from the experiment it
+describes. The outage count, the 27 months before the record and the 15 after
+are all counted from that flag at draw time, which is what lets the caption
+state that they and the in-record outages sum to the 85 reconstructed months.
+
+### Figure 10 — trend field and regional structure (`make_fig10_trend_regions.py`)
+
+Two panels: (a) the Theil–Sen trend masked to significance, with the four
+quadrants that partition the basin drawn on it; (b) the distribution of
+significant trends inside each. It replaced an earlier single-panel trend map
+whose north-western mean rested on a region that had never been written down.
+
+Non-significant pixels are **dotted, not blanked**, reusing `_stipple()` from
+`main/generate_gridded_maps.py` so the dots match the other trend maps exactly.
+Blanking them would say "no data" where the truth is "a trend was estimated
+here but the evidence is weak", and it erases the basin outline wherever weak
+pixels reach the edge.
+
+Region masks come from `main/trend_regions.region_mask()` rather than being
+re-derived here. That is not tidiness: an earlier version computed its own masks
+and silently disagreed with the summary table by 40 pixels, because one used
+half-open bounds and the other inclusive ones.
+
+### Supplementary Figure S5 — leave-one-mascon-out metrics (`make_figS5_lomo_metrics.py`)
+
+RMSE, R², NSE and mean bias error for all 19 cross-validation folds, each patch
+one GRACE mascon coloured by the score a model achieved there when that mascon
+and its neighbours were withheld.
+
+It exists because the Results section promised "the complete fold-wise spatial
+distribution of RMSE, R², NSE and bias" and pointed at `mascon_metric_maps.png`,
+which is the **well** comparison redrawn at mascon scale and covers only the 10
+of 19 mascons holding enough CGWB wells to score. Both plates are kept — they
+answer different questions — and the supplement now labels each for what it is.
+
+Bias is not in `lomo_cv_<model>.csv`; its PBIAS column is empty, because a
+percentage bias on a near-zero-mean anomaly is unstable. Mean bias error is
+therefore recomputed per mascon from `lomo_oof_<model>.csv`, and the script
+refuses to draw the figure unless recomputing RMSE from those same rows
+reproduces the stored value. It currently matches to 0.0000 mm across all 19.
+
+Each panel carries its own colour bar: two metrics are millimetres and two are
+dimensionless, so the shared scale used by `panel_figure` would leave three of
+the four unreadable. NSE is clipped at −1 with an arrow on the bar — two folds
+sit near −5 and −9, and unclipped they flatten the other seventeen into one
+colour.
+
 ### Graphical abstract (`make_graphical_abstract.py`)
 
 Built from the product rather than drawn around it. A claim and four held-out
@@ -172,22 +230,29 @@ anything, and it is gitignored — the one exception to the rule that
 this file.** It needs Pillow; if Pillow is not importable the script prints a
 notice, skips the preview and still writes both real outputs.
 
-At thumbnail size the headline, the four numbers and the panel titles hold up;
-the fact captions and the footnote disclaimer do not. That is inherent to fitting
-this much argument into 200 pixels, and is the reason the content is four panels
-rather than six.
+At thumbnail size the headline, the four numbers, their labels, the panel titles
+and the footnote all hold up. Getting there meant cutting the plate back: the
+per-fact method captions and the redundant mascons-to-cells sentence were dropped,
+the footnote was reduced to one line, and nothing is now set below 10 pt. That is
+the reason the content is four panels rather than six.
 
 ### Output
 
 | File | Size | Notes |
 |---|---|---|
-| `output/Fig1_study_area.pdf` | 5.4 MB | 183 mm wide (double column) |
-| `output/Fig1_study_area.png` | 3.9 MB | 600 dpi |
-| `output/Fig2_workflow.pdf` | 35 KB | 240 mm wide |
+| `output/Fig1_study_area.pdf` | 5.2 MB | 183 mm wide (double column) |
+| `output/Fig1_study_area.png` | 3.7 MB | 600 dpi |
+| `output/Fig2_workflow.pdf` | 34 KB | 240 mm wide |
 | `output/Fig2_workflow.png` | 810 KB | 600 dpi |
-| `output/Graphical_Abstract.pdf` | 326 KB | 11 × 4.4 in, Arial only |
-| `output/Graphical_Abstract.png` | 586 KB | 3300 × 1320 px at 300 dpi — **this is the file to submit** |
-| `output/Graphical_Abstract_preview_500x200.png` | 83 KB | gitignored; legibility proof, not for submission |
+| `output/Fig3_holdouts.pdf` | 54 KB | 185 mm wide |
+| `output/Fig3_holdouts.png` | 322 KB | 600 dpi |
+| `output/Fig10_trend_regions.pdf` | 180 KB | 188 mm wide |
+| `output/Fig10_trend_regions.png` | 817 KB | 600 dpi |
+| `output/FigS5_lomo_metrics.pdf` | 351 KB | 185 mm wide |
+| `output/FigS5_lomo_metrics.png` | 735 KB | 600 dpi |
+| `output/Graphical_Abstract.pdf` | 315 KB | 11 × 4.4 in, Arial only |
+| `output/Graphical_Abstract.png` | 503 KB | 3300 × 1320 px at 300 dpi — **this is the file to submit** |
+| `output/Graphical_Abstract_preview_500x200.png` | 75 KB | gitignored; legibility proof, not for submission |
 
 Fig 1's PDF is large because the terrain and hillshade are embedded as rasters;
 only the text and vector overlays are vector. Fig 2 is drawn entirely in vectors,
@@ -210,7 +275,21 @@ python figures/fetch_data.py        # once per clone: ~285 MB downloaded, ~845 M
 python figures/make_fig1_study_area.py
 python figures/make_fig2_workflow.py
 python figures/make_graphical_abstract.py
+python figures/make_fig3_holdouts.py        # Fig. 3
+python figures/make_fig10_trend_regions.py  # Fig. 10
+python figures/make_figS5_lomo_metrics.py   # Supplementary Fig. S5
 ```
+
+Figures 3, 10 and S5 read results rather than downloads, so they run only after
+`main/run_full_pipeline.sh` has produced
+`Results/downscaling/twsa_0p1deg_monthly_xgboost.nc`,
+`twsa_trend_significance.nc` and `trend_by_region.csv`. Neither invents a
+number: `make_fig3_holdouts.py` re-runs the seeded month selection from
+`downscale_holdouts.py` against the released observation flag, and
+`make_fig10_trend_regions.py` calls `trend_regions.summarise()` and
+`region_mask()` directly, and `make_figS5_lomo_metrics.py` checks its recomputed
+bias against the stored RMSE before drawing, so the figures, Supplementary Table
+S9 and the manuscript cannot disagree.
 
 The scripts resolve every path relative to their own location, so the working
 directory does not matter.
@@ -275,7 +354,7 @@ currently stands. Either fetch the file or guard the read.
 
 ## What is tracked and what is not
 
-The scripts, the rendered figures and `output/FIGURE_CAPTIONS.md` are not
+The scripts and the rendered figures are not
 ignored: they are the deliverable, and a reviewer or a co-author should get them
 from a clone without downloading a gigabyte first.
 
@@ -307,9 +386,26 @@ yes/no, use the exit code of `git check-ignore -q <path>` instead.
 
 ## Captions
 
-[`output/FIGURE_CAPTIONS.md`](output/FIGURE_CAPTIONS.md) holds the source
-attributions that were deliberately moved off the plates to keep them readable.
-They are not optional and they are not recoverable from the figures themselves —
-**they must appear in the manuscript captions.** That includes the Survey of
-India attribution, which is the statement that the boundary shown is the official
-one.
+The captions live in the manuscript and only there. What this file has to record
+is narrower, and it is the thing a reader of the repository alone cannot see:
+**Figure 1 is deliberately incomplete.** Four attributions were moved off the
+plate to keep it readable, they are not recoverable from the image, and they are
+not optional:
+
+* HydroSHEDS, for the terrain and river network — HydroRIVERS v1.0 and the
+  15-arcsecond void-filled DEM (Lehner & Grill, 2013);
+* the Government of India river network (data.gov.in), for the reach named
+  "Ganga" that the main channel follows;
+* Kuruva et al. (2025), for the 656 CGWB monitoring wells;
+* the **Survey of India** outline, which is the statement that the boundary
+  shown is the official one — see [the boundary requirement](#the-boundary-requirement).
+
+No other plate carries a third-party attribution: Figure 2 is drawn from nothing
+external, and Figures 3, 10 and S5 are drawn from the archived result files.
+
+A second copy of the captions used to live at `output/FIGURE_CAPTIONS.md`. It was
+removed because it drifted: it described Figure 2's colour key backwards — saying
+filled boxes were the fitted steps, when the filled boxes are the constraints and
+are precisely the steps where nothing is fitted — and that error reached the
+submitted manuscript before it was caught. The requirement is worth recording;
+a duplicate of the captions is not.
