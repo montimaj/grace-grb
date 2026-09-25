@@ -410,8 +410,8 @@ substitute is already available, since every number in this release comes from
 the rasterised `basin_frac` mask rather than from the polygon itself.
 
 Code and data ship as one record, so there is no separate code DOI. The
-associated paper is under review at *Groundwater for Sustainable Development*;
-its DOI will be added to this record on acceptance.
+associated paper has been accepted in *Groundwater for Sustainable Development*;
+its DOI will be added to this record on publication.
 
 ---
 

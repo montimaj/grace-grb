@@ -395,5 +395,5 @@ model that tuning had made *worse* appeared as a negative number.
 Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
 Thakur, P. K. (2026). *Explainable AI-Based Spatial Downscaling and Water
 Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage
-Anomalies over the Ganges River Basin.* Under review, **Groundwater for Sustainable
+Anomalies over the Ganges River Basin.* Accepted, **Groundwater for Sustainable
 Development**.
