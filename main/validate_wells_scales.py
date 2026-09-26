@@ -465,8 +465,7 @@ def plot_metric_maps(obs: pd.DataFrame, out_dir: str) -> Optional[str]:
         ax.text(0.0, 1.015, spec['note'], transform=ax.transAxes,
                 fontsize=6, color=SCI_MUTED, ha='left', va='bottom')
 
-    fig.suptitle(f'Product skill against {len(per_well)} CGWB dug wells, well by well',
-                 fontweight='bold', color=SCI_INK, fontsize=10, x=0.006, ha='left')
+    # No title on the plate: the manuscript caption carries it (as for Figs. 3, 5 and 10).
     p = os.path.join(out_dir, 'well_metric_maps.png')
     figure_captions.record(
         p,

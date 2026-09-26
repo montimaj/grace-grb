@@ -192,9 +192,7 @@ def plot_annual_cycle(series: pd.DataFrame, model_name: str,
         ax.set_title(ttl, fontweight='bold', color=SCI_INK, loc='left',
                      fontsize=10, pad=8)
 
-    fig.suptitle(f'Basin annual cycle, leave-one-mascon-out ({model_name})',
-                 fontweight='bold', color=SCI_INK, fontsize=13, x=0.006,
-                 ha='left')
+    # No title on the plate: the manuscript caption carries it (as for Figs. 3, 5 and 10).
 
     p = os.path.join(out_dir, f'Fig_annual_cycle_{model_name}.png')
     fig.savefig(p, dpi=DPI, bbox_inches='tight', facecolor='white')

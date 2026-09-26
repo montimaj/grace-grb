@@ -50,17 +50,30 @@ Section 5.5 are produced by `main/trend_regions.py`, which exists only from
   **`figures/make_fig5_lomo_metrics.py`** (Fig. 5). Fig. 10 takes its region
   masks from `trend_regions.region_mask()` rather than recomputing them, after
   an earlier version disagreed with the table by 40 pixels.
+- **`figures/make_fig6_seasonal_cycle.py`** (Fig. 6), which stacks the
+  annual-cycle and seasonal-mean plates into the single file the journal takes.
+  It pastes the rendered PNGs rather than redrawing them, so Fig. 6 stays what
+  the pipeline writes.
 
 ### Changed
 
 - **Manuscript title**, which gained *Anomalies*: "... Disaggregation of GRACE
   Terrestrial Water Storage **Anomalies** over the Ganges River Basin". TWSA is
   the quantity the model actually produces, and the title now says so.
+- **Paper citation** now points to the published article, *Groundwater for
+  Sustainable Development*, 101688,
+  <https://doi.org/10.1016/j.gsd.2026.101688>, in every README and
+  `DATA_README.md`, and `CITATION.cff` lists it under `references`.
 - Fig. 10 replaces the former trend map, carrying the same field with the
   quadrant boundaries drawn on it and a second panel showing the distribution of
   trends within each region.
 - `figures/README.md` now states the Figure 1 attribution requirement directly,
   in place of the removed caption file.
+- **No title on the manuscript plates.** Figs. 4, 6, 7, 8 and 9 lost the title
+  drawn above them, as Figs. 3, 5 and 10 already had: the caption carries it,
+  and a second copy is one more thing to drift. Fig. 8's panels are now labelled
+  (a)–(c), in bold, like the other multi-panel figures. Only the drawing changed;
+  every plotted value is the same.
 
 ### Removed
 
@@ -97,7 +110,7 @@ themselves rather than against the previous README.
   source archive, contradicting what the record itself asserts. Both now agree
   with `DATA_README.md`.
 - **Deposit manifest.** The file counts for `evaluation_tables.zip` (23 → 24) and
-  `figures.zip` (22 → 30) were stale for exactly the two archives this release
+  `figures.zip` (22 → 31) were stale for exactly the two archives this release
   rebuilds; `grace-grb-1.0.1.zip` and `trend_by_region.csv` had no manifest row
   at all; and a `covariate_gate_<model>.csv` row named a file that exists neither
   in the archive nor in the repository.

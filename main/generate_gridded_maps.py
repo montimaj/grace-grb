@@ -267,7 +267,7 @@ def seasonal_maps(prod: Dict[str, object], out_dir: str) -> str:
         fields, titles, prod['lon'], prod['lat'], prod['gdf'],
         'TWSA (mm)', diverging=True,
         out_path=os.path.join(out_dir, 'Fig_seasonal_mean_0p1deg.png'),
-        ncols=4, suptitle='Seasonal mean terrestrial water storage anomaly, 0.1°',
+        ncols=4, suptitle=None,  # no title on the plate: the manuscript caption carries it
         footnote=f'{months[0]:%Y-%m} to {months[-1]:%Y-%m}.')
 
 
@@ -523,7 +523,7 @@ def uncertainty_maps(prod: Dict[str, object], out_dir: str) -> Optional[str]:
         fields, titles, prod['lon'], prod['lat'], prod['gdf'],
         'Uncertainty, 1σ (mm)', diverging=False,
         out_path=os.path.join(out_dir, 'Fig_uncertainty_components_0p1deg.png'),
-        ncols=4, suptitle='Per-pixel uncertainty, time-mean',
+        ncols=4, suptitle=None,  # no title on the plate: the manuscript caption carries it
         footnote='Within-mascon spread is a LOWER BOUND: GRACE resolves ~20 mascons here, '
                  'so no observation constrains sub-mascon structure.')
 
@@ -560,7 +560,7 @@ def method_comparison(prod: Dict[str, object], out_dir: str,
         fields, titles, prod['lon'], prod['lat'], prod['gdf'],
         'TWSA (mm)', diverging=True,
         out_path=os.path.join(out_dir, f'Fig_method_comparison_{when}.png'),
-        ncols=3, suptitle=f'Downscaling versus interpolation, {when}',
+        ncols=3, suptitle=None,  # no title on the plate: the manuscript caption carries it
         footnote='All three reproduce GRACE at mascon scale; they differ only in the '
                  'sub-mascon structure they imply.')
 

@@ -718,13 +718,14 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
         ax.set_yticklabels(d[label_col], fontsize=6.5, color=SCI_INK)
         ax.set_xlabel('Share of total mean absolute attribution (%)', color=SCI_INK,
                       fontsize=7)
-        ax.set_title(title, fontsize=8, color=SCI_INK, loc='left')
+        ax.set_title(title, fontsize=8, fontweight='bold', color=SCI_INK, loc='left')
         return d
 
+    # Panel letters as (a)-(c) and bold, as on the other multi-panel plates.
     bars(ax_f, field, 'family', SCI_BLUE,
-         'a. By source field, signed contributions summed within family')
+         '(a) By source field, signed contributions summed within each field')
     bars(ax_t, term, 'family', SCI_BLUE,
-         'b. By term type, the partition a memory claim needs')
+         '(b) By term type, the partition a memory claim needs')
 
     # Panel (c) is coloured by source field so the credit-splitting is visible:
     # one field's columns appear in one colour, repeatedly, down the ranking.
@@ -734,7 +735,7 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
     cmap = {fam: SCI_COLORS[i % len(SCI_COLORS)] for i, fam in enumerate(order)}
     bars(ax_c, top, 'display', [cmap[f] for f in
                                 top.sort_values('share_pct').field_family],
-         f'c. Top {min(top_n, len(top))} individual columns, for comparison -- '
+         f'(c) Top {min(top_n, len(top))} individual columns; '
          'one field is split across several bars')
     handles = [plt.Rectangle((0, 0), 1, 1, color=cmap[f]) for f in order]
     ax_c.legend(handles, order, frameon=False, fontsize=6, loc='lower right')
@@ -748,9 +749,7 @@ def plot(field: pd.DataFrame, term: pd.DataFrame, columns: pd.DataFrame,
             ax.spines[side].set_color(SCI_MUTED)
         ax.tick_params(colors=SCI_MUTED, labelsize=6.5)
 
-    fig.suptitle(f'TWSA anomaly attribution, {pretty_model(model_name)} '
-                 '(TreeSHAP, association only)',
-                 fontsize=9, color=SCI_INK, x=0.012, ha='left', y=0.992)
+    # No title on the plate: the manuscript caption carries it (as for Figs. 3, 5 and 10).
     # Caption recorded, not drawn -- see figure_captions.
     figure_captions.record(
         out_path,

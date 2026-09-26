@@ -152,7 +152,7 @@ contents.
 | `cogs_daily.zip` | the daily product as COGs, three bands (`twsa_flux`, `twsa_state`, `daily_method_spread`) | 9,497 rasters + `metadata.csv` + `upload.sh` |
 | `trend_field.zip` | the per-pixel trend in both formats: `twsa_trend_significance.nc` and a 9-band COG (`sen_slope`, `ols_slope`, `p_value`, `z_score`, `kendall_tau`, `variance_factor`, `significant`, `significant_fdr`, `tested`) | 4 |
 | `evaluation_tables.zip` | every validation table and the tuning record — see *Evaluation files* below. The fitted model (`model_<model>.joblib`) and the output-tree README ship with the code archive, not here | 24 |
-| `figures.zip` | per-pixel maps, diagnostic figures, and the manuscript figures | 30 |
+| `figures.zip` | per-pixel maps, diagnostic figures, and the manuscript figures | 31 |
 | `grace-grb-1.0.1.zip` | the source tree at the tagged release, GPL-3.0-only under its own `LICENSE`; also holds the fitted model (`model_<model>.joblib`) and the output-tree README | 149 |
 | `inputs_raw_gee.zip` | the raw Earth Engine downloads the ERA5-Land and GRACE cubes are built from; GLDAS tiles excluded | 4,680 |
 | `inputs_static_covariates.zip` | the nine static covariate rasters | 53 |
@@ -409,9 +409,14 @@ product with its own terms, this row is the one to revisit — and the safe
 substitute is already available, since every number in this release comes from
 the rasterised `basin_frac` mask rather than from the polygon itself.
 
-Code and data ship as one record, so there is no separate code DOI. The
-associated paper has been accepted in *Groundwater for Sustainable Development*;
-its DOI will be added to this record on publication.
+Code and data ship as one record, so there is no separate code DOI. Cite the
+associated paper alongside it:
+
+> Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
+> Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water
+> Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage
+> Anomalies over the Ganges River Basin. *Groundwater for Sustainable
+> Development*, 101688. <https://doi.org/10.1016/j.gsd.2026.101688>
 
 ---
 

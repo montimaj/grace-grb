@@ -183,4 +183,5 @@ https://doi.org/10.5281/zenodo.21745158 — concept DOI; cite the **version** DO
 in a paper.
 
 Cite the paper alongside it: Kaushik et al. (2026), _Groundwater for Sustainable
-Development_ (accepted). Full entry in the [root README](../README.md).
+Development_, 101688, https://doi.org/10.1016/j.gsd.2026.101688. Full entry in
+the [root README](../README.md).

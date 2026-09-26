@@ -1,5 +1,5 @@
 """
-Supplementary figure -- leave-one-mascon-out skill, metric by metric.
+Figure 5 -- leave-one-mascon-out skill, metric by metric.
 
 WHY THIS FIGURE EXISTS
 ----------------------

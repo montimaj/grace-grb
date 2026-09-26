@@ -20,7 +20,7 @@ the significance-masked trend. Source in [`gee/`](gee/).
 
 ### The paper
 
-Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River Basin. _Accepted in Groundwater for Sustainable Development._
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., & Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River Basin. _Groundwater for Sustainable Development_, 101688. https://doi.org/10.1016/j.gsd.2026.101688
 
 ### The data and code
 
@@ -168,9 +168,10 @@ grace-grb/
 │   ├── make_fig3_holdouts.py           # Fig. 3: what each temporal holdout withholds
 │   ├── make_fig10_trend_regions.py     # Fig. 10: trend field and its regional structure
 │   ├── make_fig5_lomo_metrics.py       # Fig. 5: leave-one-mascon-out skill per metric
+│   ├── make_fig6_seasonal_cycle.py     # Fig. 6: its two plates stacked into the one file the journal takes
 │   ├── make_graphical_abstract.py      # Graphical abstract, 2.5:1 for Elsevier; checks its own layout
 │   ├── data/                           # Generated: ~845 MB of basemaps, gitignored
-│   └── output/                         # Fig1, Fig2, Fig3, Fig5, Fig10, graphical abstract (PDF + PNG)
+│   └── output/                         # Fig1, Fig2, Fig3, Fig5, Fig10, graphical abstract (PDF + PNG); Fig6 (PNG)
 ├── gee/                                # Earth Engine explorer app — public, no account needed
 │   ├── README.md
 │   └── twsa_explorer.js

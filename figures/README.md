@@ -159,6 +159,17 @@ the four unreadable. NSE is clipped at −1 with an arrow on the bar — two fol
 sit near −5 and −9, and unclipped they flatten the other seventeen into one
 colour.
 
+### Figure 6 — seasonal cycle (`make_fig6_seasonal_cycle.py`)
+
+The two plates the manuscript sets one above the other under a single caption,
+stacked into the one file the journal takes: the basin-mean annual cycle from
+`main/downscale_annual_cycle.py` above, the 0.1° seasonal means from
+`main/generate_gridded_maps.py` below. Nothing is redrawn — the script pastes the
+rendered PNGs, resampling the lower plate by 4% to the upper one's width so the
+two share edges — which keeps Fig. 6 pixel for pixel what the pipeline writes.
+It reads `Results/`, not downloads, and refuses to run if either plate is missing
+or the two are at different DPI.
+
 ### Graphical abstract (`make_graphical_abstract.py`)
 
 Built from the product rather than drawn around it. A claim and four held-out
@@ -250,6 +261,7 @@ the reason the content is four panels rather than six.
 | `output/Fig10_trend_regions.png` | 817 KB | 600 dpi |
 | `output/Fig5_lomo_metrics.pdf` | 339 KB | 185 mm wide |
 | `output/Fig5_lomo_metrics.png` | 657 KB | 600 dpi |
+| `output/Fig6_seasonal_cycle.png` | 2.0 MB | 600 dpi, 11.1 × 9.7 in; PNG only, as it is stacked from two rendered PNGs |
 | `output/Graphical_Abstract.pdf` | 315 KB | 11 × 4.4 in, Arial only |
 | `output/Graphical_Abstract.png` | 503 KB | 3300 × 1320 px at 300 dpi — **this is the file to submit** |
 | `output/Graphical_Abstract_preview_500x200.png` | 75 KB | gitignored; legibility proof, not for submission |
@@ -278,14 +290,16 @@ python figures/make_graphical_abstract.py
 python figures/make_fig3_holdouts.py        # Fig. 3
 python figures/make_fig10_trend_regions.py  # Fig. 10
 python figures/make_fig5_lomo_metrics.py    # Fig. 5
+python figures/make_fig6_seasonal_cycle.py  # Fig. 6
 ```
 
-Figures 3, 10 and S5 read results rather than downloads, so they run only after
+Figures 3, 5, 6 and 10 read results rather than downloads, so they run only after
 `main/run_full_pipeline.sh` has produced
 `Results/downscaling/twsa_0p1deg_monthly_xgboost.nc`,
-`twsa_trend_significance.nc` and `trend_by_region.csv`. Neither invents a
-number: `make_fig3_holdouts.py` re-runs the seeded month selection from
-`downscale_holdouts.py` against the released observation flag, and
+`twsa_trend_significance.nc` and `trend_by_region.csv` — and, for Fig. 6, the
+two plates it stacks. None invents a number: `make_fig3_holdouts.py` re-runs the
+seeded month selection from `downscale_holdouts.py` against the released
+observation flag, and
 `make_fig10_trend_regions.py` calls `trend_regions.summarise()` and
 `region_mask()` directly, and `make_fig5_lomo_metrics.py` checks its recomputed
 bias against the stored RMSE before drawing, so the figures, Supplementary Table
@@ -401,7 +415,7 @@ not optional:
   shown is the official one — see [the boundary requirement](#the-boundary-requirement).
 
 No other plate carries a third-party attribution: Figure 2 is drawn from nothing
-external, and Figures 3, 10 and S5 are drawn from the archived result files.
+external, and Figures 3, 5, 6 and 10 are drawn from the archived result files.
 
 A second copy of the captions used to live at `output/FIGURE_CAPTIONS.md`. It was
 removed because it drifted: it described Figure 2's colour key backwards — saying

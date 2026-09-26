@@ -97,6 +97,31 @@ identifiers:
     value: 10.5281/zenodo.21745158
     description: Concept DOI, resolving to the latest version of this record
 
+# The paper that describes this record. Listed under `references`, not as
+# `preferred-citation`: the latter would make GitHub's "Cite this repository"
+# offer the article in place of the data set, and both are meant to be cited.
+references:
+  - type: article
+    title: >-
+      Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River Basin
+    authors:
+      - family-names: Kaushik
+        given-names: P. R.
+      - family-names: Majumdar
+        given-names: S.
+      - family-names: Lenczuk
+        given-names: A.
+      - family-names: Sharma
+        given-names: Y. K.
+      - family-names: Banerjee
+        given-names: S.
+      - family-names: Thakur
+        given-names: P. K.
+    journal: Groundwater for Sustainable Development
+    year: 2026
+    doi: 10.1016/j.gsd.2026.101688
+    url: "https://doi.org/10.1016/j.gsd.2026.101688"
+
 keywords:
   - GRACE
   - GRACE-FO
