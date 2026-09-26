@@ -153,7 +153,7 @@ contents.
 | `trend_field.zip` | the per-pixel trend in both formats: `twsa_trend_significance.nc` and a 9-band COG (`sen_slope`, `ols_slope`, `p_value`, `z_score`, `kendall_tau`, `variance_factor`, `significant`, `significant_fdr`, `tested`) | 4 |
 | `evaluation_tables.zip` | every validation table and the tuning record — see *Evaluation files* below. The fitted model (`model_<model>.joblib`) and the output-tree README ship with the code archive, not here | 24 |
 | `figures.zip` | per-pixel maps, diagnostic figures, and the manuscript figures | 31 |
-| `grace-grb-1.0.1.zip` | the source tree at the tagged release, GPL-3.0-only under its own `LICENSE`; also holds the fitted model (`model_<model>.joblib`) and the output-tree README | 149 |
+| `grace-grb-1.0.1.zip` | the source tree at the tagged release, GPL-3.0-only under its own `LICENSE`; also holds the fitted model (`model_<model>.joblib`) and the output-tree README | 151 |
 | `inputs_raw_gee.zip` | the raw Earth Engine downloads the ERA5-Land and GRACE cubes are built from; GLDAS tiles excluded | 4,680 |
 | `inputs_static_covariates.zip` | the nine static covariate rasters | 53 |
 | `inputs_basin_shapefile.zip` | the Ganga basin boundary | 8 |

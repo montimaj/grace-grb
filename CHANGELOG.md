@@ -20,7 +20,7 @@ Changes made while answering the second round of review for *Groundwater for
 Sustainable Development*. No value in the product changed: the 0.1° monthly and
 daily fields, the model and the uncertainty components are bit-for-bit those of
 1.0.0. Two things changed. Numbers quoted in the paper became reproducible, which
-added one result file, `Results/downscaling/trend_by_region.csv`, and three figure
+added one result file, `Results/downscaling/trend_by_region.csv`, and four figure
 scripts. And the deposit's own documentation was corrected against the archives:
 most consequentially, a licence note that denied redistributing three
 NonCommercial-restricted raster sets the record does in fact redistribute.
