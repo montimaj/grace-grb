@@ -29,7 +29,7 @@ The code and data behind the paper as published in *Groundwater for Sustainable 
 - **No titles on the manuscript figures.** The plotting code no longer draws a title above Figs. 4, 6, 7, 8 and 9; the caption carries it, as it already did for Figs. 3, 5 and 10. Fig. 8's panels are now labelled (a)–(c) in bold, like the other multi-panel figures. Only the drawing changed; every plotted value is the same.
 - **Graphical abstract** — the arrow between the claim and the map panels is gone; it overlapped the TWSA panel title.
 - **Badges** at the top of `README.md` for the paper, the Zenodo record, both licences, the Python version and the Earth Engine app.
-- **Zenodo preview** — the record carries a loose copy of `Graphical_Abstract.png`, set as its preview image; the same file stays in `figures.zip`.
+- **Zenodo preview** — the record carries `Graphical_Abstract_preview.png`, the graphical abstract reduced to 750 × 300 px and set as its preview image; the full-resolution original stays in `figures.zip`.
 - `figures/README.md` states the Figure 1 attribution requirement directly and documents each new figure script.
 
 ### Removed

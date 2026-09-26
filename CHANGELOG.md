@@ -71,9 +71,9 @@ Section 5.5 are produced by `main/trend_regions.py`, which exists only from
   gone; it overlapped the TWSA panel title.
 - **Badges** at the top of `README.md` for the paper, the Zenodo record, both
   licences, the Python version and the Earth Engine app.
-- **Zenodo preview.** The record carries a loose copy of
-  `Graphical_Abstract.png`, set as its preview image; the same file stays in
-  `figures.zip`.
+- **Zenodo preview.** The record carries `Graphical_Abstract_preview.png`, the
+  graphical abstract reduced to 750 × 300 px and set as its preview image; the
+  full-resolution original stays in `figures.zip`.
 - Fig. 10 replaces the former trend map, carrying the same field with the
   quadrant boundaries drawn on it and a second panel showing the distribution of
   trends within each region.
