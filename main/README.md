@@ -121,7 +121,7 @@ sweep that has gone stale is announced rather than found later in a figure.
 | `utils.py` | data loading, GRACE reader, metrics, SHAP, plotting |
 | `stats_utils.py` | bootstrap CIs (block **and** cluster), significance tests, and the trend layer: Mann-Kendall with Hamed-Rao variance inflation, Sen's slope, seasonal MK, Benjamini-Hochberg |
 | `plot_style.py` | central figure styling — 600 dpi, CVD-safe palette |
-| `figure_captions.py` | caption text held in code rather than burned into the plates, so the journal's caption and the figure cannot disagree |
+| `figure_captions.py` | caption text held in code rather than burned into the figures, so the journal's caption and the figure cannot disagree |
 | `models.py` | model wrappers used by the **legacy** basin-scale path |
 
 ---

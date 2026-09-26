@@ -246,6 +246,10 @@ per-pixel uncertainty, 2000–2025_ [Data set]. Zenodo.
 https://doi.org/10.5281/zenodo.21745158 — concept DOI; cite the **version** DOI
 in a paper.
 
-Cite the paper alongside it: Kaushik et al. (2026), _Groundwater for Sustainable
-Development_, 101688, https://doi.org/10.1016/j.gsd.2026.101688. Full entry in
-the [root README](../README.md).
+Cite the paper alongside it:
+
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
+Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water
+Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage
+Anomalies over the Ganges River Basin. _Groundwater for Sustainable
+Development_, 101688. https://doi.org/10.1016/j.gsd.2026.101688

@@ -853,6 +853,16 @@ not be quoted as the model's skill.
 
 ---
 
+## Citation
+
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
+Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water
+Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage
+Anomalies over the Ganges River Basin. *Groundwater for Sustainable
+Development*, 101688. https://doi.org/10.1016/j.gsd.2026.101688
+
+---
+
 ## References
 
 - Kuruva, S.K., Suryawanshi, M.R., Shakya, A. et al. Quality controlled, reliable

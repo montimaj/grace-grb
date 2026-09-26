@@ -51,7 +51,7 @@ Section 5.5 are produced by `main/trend_regions.py`, which exists only from
   masks from `trend_regions.region_mask()` rather than recomputing them, after
   an earlier version disagreed with the table by 40 pixels.
 - **`figures/make_fig6_seasonal_cycle.py`** (Fig. 6), which stacks the
-  annual-cycle and seasonal-mean plates into the single file the journal takes.
+  annual-cycle and seasonal-mean images into the single file the journal takes.
   It pastes the rendered PNGs rather than redrawing them, so Fig. 6 stays what
   the pipeline writes.
 
@@ -62,14 +62,24 @@ Section 5.5 are produced by `main/trend_regions.py`, which exists only from
   the quantity the model actually produces, and the title now says so.
 - **Paper citation** now points to the published article, *Groundwater for
   Sustainable Development*, 101688,
-  <https://doi.org/10.1016/j.gsd.2026.101688>, in every README and
-  `DATA_README.md`, and `CITATION.cff` lists it under `references`.
+  <https://doi.org/10.1016/j.gsd.2026.101688>, in every README, `METHODS.md`
+  and `DATA_README.md`, and `CITATION.cff` lists it under `references`.
+- **`CITATION.cff`** describes the record as a data set rather than software,
+  and carries v1.0.1 with its version DOI alongside the concept DOI.
+- **The Earth Engine explorer** links the v1.0.1 record.
+- **Graphical abstract**: the arrow between the claim and the map panels is
+  gone; it overlapped the TWSA panel title.
+- **Badges** at the top of `README.md` for the paper, the Zenodo record, both
+  licences, the Python version and the Earth Engine app.
+- **Zenodo preview.** The record carries a loose copy of
+  `Graphical_Abstract.png`, set as its preview image; the same file stays in
+  `figures.zip`.
 - Fig. 10 replaces the former trend map, carrying the same field with the
   quadrant boundaries drawn on it and a second panel showing the distribution of
   trends within each region.
 - `figures/README.md` now states the Figure 1 attribution requirement directly,
   in place of the removed caption file.
-- **No title on the manuscript plates.** Figs. 4, 6, 7, 8 and 9 lost the title
+- **No titles on the manuscript figures.** Figs. 4, 6, 7, 8 and 9 lost the title
   drawn above them, as Figs. 3, 5 and 10 already had: the caption carries it,
   and a second copy is one more thing to drift. Fig. 8's panels are now labelled
   (a)–(c), in bold, like the other multi-panel figures. Only the drawing changed;
@@ -118,9 +128,14 @@ themselves rather than against the previous README.
   `TODO.md` reference to a file that ships in neither the deposit nor the source
   archive, and an instruction about settling licences "before this record is
   published", which does not belong on a permanent archive.
-- `README.md` gained the four scripts this release adds, which its file tree had
+- `README.md` gained the five scripts this release adds, which its file tree had
   never listed, and six stale figure sizes in `figures/README.md` were corrected
   against the files on disk.
+- **`README.md`'s project tree** described `DATA_README.md` as the README of a
+  separate data record, when code and data ship as one, and said
+  `run_full_pipeline.sh` regenerates everything, when the `figures/` scripts run
+  separately. `figures/README.md` opened by listing only Figures 1 and 2 and the
+  graphical abstract; it now lists every figure it draws.
 
 ---
 

@@ -141,6 +141,11 @@ size.
 | `twsa_0p1deg_daily.nc` | 9497 × 101 × 179 | `twsa_flux`, `twsa_state`, `daily_method_spread`, `grace_observed` | ~799 MB |
 | `twsa_0p1deg_monthly_<model>.nc` | 312 × 101 × 179 | `twsa`, `grace_observed` | ~10 MB |
 
+**Loose — the graphical abstract.** `Graphical_Abstract.png` (3300 × 1320 px,
+300 dpi) is the record's preview image. It is the same file as
+`figures/output/Graphical_Abstract.png` inside `figures.zip`, loose only so that
+Zenodo can show it on the record page.
+
 **Bundled — everything else.** Zipping here is a file-count device, not a
 compression one: the netCDFs are already internally compressed (`zlib` level 4)
 and the COGs are DEFLATE, so the archives are close to the size of their

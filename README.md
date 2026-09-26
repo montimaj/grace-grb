@@ -1,14 +1,21 @@
 # Explainable AI-Based Spatial Downscaling and Water Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage Anomalies over the Ganges River Basin
 
+[![GSD paper: Kaushik et al. (2026)](https://img.shields.io/badge/GSD%20paper-Kaushik%20et%20al.%20%282026%29-E9711C)](https://doi.org/10.1016/j.gsd.2026.101688)
+[![Zenodo](https://img.shields.io/badge/Zenodo-10.5281%2Fzenodo.22718970-1682D4)](https://doi.org/10.5281/zenodo.22718970)
+[![Code licence: GPL-3.0-only](https://img.shields.io/badge/code-GPL--3.0--only-6F42C1)](LICENSE)
+[![Data licence: CC BY 4.0](https://img.shields.io/badge/data-CC%20BY%204.0-6F42C1)](https://creativecommons.org/licenses/by/4.0/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](environment.yml)
+[![Earth Engine app: twsa-explorer](https://img.shields.io/badge/Earth%20Engine-twsa--explorer-34A853)](https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer)
+
 > **On "Ganga" and "Ganges".** They are the same river. The manuscript title, the
-> figure plates and the abstract use **Ganges**, the exonym the journal's
+> figures and the abstract use **Ganges**, the exonym the journal's
 > readership will search for; body text and code use **Ganga**, the official
 > name used by the Central Water Commission and by CGWB, whose wells are the
 > validation set here. The Zenodo record glosses both. The mix is deliberate, and
 > two occurrences must never be "corrected": the `Ganga Basin Shapefile/` path,
 > and the `rivname == 'Ganga'` value in the Government of India river network
 > that draws the main channel in Figure 1. Renaming either breaks something
-> silently — the first a load, the second the red channel on the plate.
+> silently — the first a load, the second the red channel on the map.
 
 ### 🌍 [Explore the product in your browser](https://grace-grb-ml.projects.earthengine.app/view/twsa-explorer)
 
@@ -100,7 +107,7 @@ grace-grb/
 │   │   ├── raw/                        #   one GeoTIFF per (grid, variable, month)
 │   │   ├── cubes/                      #   era5/gldas/grace cubes + grids_aux.nc
 │   │   └── wells/                      #   ingested well metadata and GWS anomalies
-│   └── Outputs/                        # Processed basin-mean CSVs
+│   └── Outputs/                        # Generated: the basin-mean GEE download behind All_Data.csv (gitignored)
 ├── Results/
 │   ├── README.md
 │   ├── downscaling/                    # THE PRODUCTS: 0.1 deg monthly + daily, and all
@@ -113,15 +120,15 @@ grace-grb/
 │                                       #   LEGACY basin-scale; written only under --with-legacy,
 │                                       #   so a tree without them is the normal outcome
 ├── main/
-│   ├── README.md                       # Detailed methods and API reference
-│   ├── run_full_pipeline.sh               # SINGLE ENTRY POINT - regenerates everything
+│   ├── README.md                       # Module reference; the method itself is in METHODS.md
+│   ├── run_full_pipeline.sh            # SINGLE ENTRY POINT - regenerates Results/; figures/ runs separately
 │   │
 │   │   # --- shared ---
 │   ├── utils.py                        # Data loading, GRACE reader, metrics, SHAP, plotting
 │   ├── models.py                       # ML model wrappers (LSTM, BiLSTM, XGBoost, ...)
 │   ├── stats_utils.py                  # Bootstrap CIs, significance tests, leakage-aware CV
 │   ├── plot_style.py                   # Central figure styling (600 DPI, clean labels)
-│   ├── figure_captions.py              # Caption text, kept out of the plates rather than burned in
+│   ├── figure_captions.py              # Caption text, kept out of the figures rather than burned in
 │   │
 │   │   # --- basin-scale (temporal downscaling) ---
 │   ├── run_analysis.py                 # LEGACY basin-scale holdouts (--with-legacy)
@@ -146,7 +153,7 @@ grace-grb/
 │   ├── tune_gridded.py                 # Optuna for tree candidates + CV selection of the product model
 │   ├── mlp_configuration_sweep.py      # ONE-OFF: fixes the MLP's configuration, releases the sweep
 │   ├── downscale_model.py              # Spatial CV + 0.1 deg monthly product + mass conservation
-│   ├── downscale_shap.py               # TreeSHAP on the fitted model, grouped by feature family
+│   ├── downscale_shap.py               # TreeSHAP on the fitted model, grouped by source field and by term type
 │   ├── downscale_uncertainty.py        # Per-pixel uncertainty ensemble
 │   ├── downscale_daily.py              # DAILY product (water-balance disaggregation)
 │   ├── downscale_holdouts.py           # Month holdouts: random / blocked / forward
@@ -166,9 +173,9 @@ grace-grb/
 │   ├── make_fig1_study_area.py
 │   ├── make_fig2_workflow.py
 │   ├── make_fig3_holdouts.py           # Fig. 3: what each temporal holdout withholds
-│   ├── make_fig10_trend_regions.py     # Fig. 10: trend field and its regional structure
 │   ├── make_fig5_lomo_metrics.py       # Fig. 5: leave-one-mascon-out skill per metric
-│   ├── make_fig6_seasonal_cycle.py     # Fig. 6: its two plates stacked into the one file the journal takes
+│   ├── make_fig6_seasonal_cycle.py     # Fig. 6: its two images stacked into the one file the journal takes
+│   ├── make_fig10_trend_regions.py     # Fig. 10: trend field and its regional structure
 │   ├── make_graphical_abstract.py      # Graphical abstract, 2.5:1 for Elsevier; checks its own layout
 │   ├── data/                           # Generated: ~845 MB of basemaps, gitignored
 │   └── output/                         # Fig1, Fig2, Fig3, Fig5, Fig10, graphical abstract (PDF + PNG); Fig6 (PNG)
@@ -177,10 +184,10 @@ grace-grb/
 │   └── twsa_explorer.js
 ├── paper/                              # Manuscript and reviewer materials — GITIGNORED, not in the repo
 │   ├── README.md                       #   an inventory of what is live and what is superseded
-│   └── FInal/R2/                       #   the revision currently with the journal
+│   └── FInal/R2/                       #   the final revision, as accepted and published
 ├── CITATION.cff                        # Citation and Zenodo deposit metadata
-├── DATA_README.md                      # README for the separate Zenodo DATA record
-├── CHANGELOG.md                        # What this replaced and why; the superseded abstract
+├── DATA_README.md                      # README for the Zenodo record; code and data ship as one
+├── CHANGELOG.md                        # Version history, what this replaced and why, the superseded abstract
 └── METHODS.md                          # The scientific method: what is fitted, what is not
 ```
 

@@ -1,9 +1,10 @@
 # `figures/` — manuscript figures
 
-Figures 1 and 2 of the revised manuscript and the graphical abstract, and the
-code that draws them. All three are rewrites rather than restyles: the submitted
-versions showed a variable the paper does not use, a method the paper no longer
-uses, and clip art.
+Figures 1, 2, 3, 5, 6 and 10 of the manuscript and the graphical abstract, and
+the code that draws them; Figures 4, 7, 8 and 9 are drawn by the pipeline in
+`main/`. Figures 1 and 2 and the graphical abstract are rewrites rather than
+restyles: the submitted versions showed a variable the paper does not use, a
+method the paper no longer uses, and clip art.
 
 This file documents the figures only. The scientific method is in
 [METHODS.md](../METHODS.md), the code reference is in
@@ -15,8 +16,9 @@ Terminology follows METHODS.md strictly: the spatial step is **downscaling**, th
 daily step is **disaggregation**. The figures use the words that way and so does
 this file.
 
-**Drawn text on all three plates says "Ganges"**, matching the manuscript title;
-prose and code here say "Ganga". See the note at the top of the
+**Drawn text says "Ganges"** on the two figures that name the basin, Figure 1 and
+the graphical abstract, matching the manuscript title; prose and code here say
+"Ganga". See the note at the top of the
 [root README](../README.md) for why, and for the one string in this directory
 that must never be renamed — `rivname == 'Ganga'` in `make_fig1_study_area.py`,
 which is a value in the Government of India river network, not a word.
@@ -48,7 +50,7 @@ exits non-zero on a file that fails. Two things that check does not do:
 
 Nothing outside India is drawn as a political entity. The basin crosses into
 Nepal, Bangladesh and China; those are labelled in text rather than outlined, so
-the plate asserts no boundary it cannot source.
+the figure asserts no boundary it cannot source.
 
 ---
 
@@ -67,7 +69,7 @@ also the reason fine structure in the product is inferred rather than observed.
 
 Twenty-two mascons touch the basin at all; the figure draws the 19 with basin
 fraction above 0.5, because those are the ones leave-one-mascon-out actually
-holds out. Drawing all 22 would put a number on the plate that no table in the
+holds out. Drawing all 22 would put a number on the figure that no table in the
 paper supports.
 
 **What it replaced.** A land-cover map of the basin with wells scattered on top.
@@ -76,6 +78,22 @@ figure spent its whole area on a variable the paper does not use while the
 constraint that governs the work went unshown. The old palette (yellow markers on
 orange land) also failed in greyscale and under common colour-vision
 deficiencies.
+
+**Four attributions are not drawn on the figure.** They were left off to keep
+it readable, they are not recoverable from the image, and they are not optional.
+The manuscript caption carries all four, and any other use of the figure must
+too:
+
+* HydroSHEDS, for the terrain and river network — HydroRIVERS v1.0 and the
+  15-arcsecond void-filled DEM (Lehner & Grill, 2013);
+* the Government of India river network (data.gov.in), for the reach named
+  "Ganga" that the main channel follows;
+* Kuruva et al. (2025), for the 656 CGWB monitoring wells;
+* the **Survey of India** outline, which is the statement that the boundary
+  shown is the official one — see [the boundary requirement](#the-boundary-requirement).
+
+No other figure carries a third-party attribution: Figure 2 is drawn from nothing
+external, and Figures 3, 5, 6 and 10 are drawn from the archived result files.
 
 ### Figure 2 — method workflow (`make_fig2_workflow.py`)
 
@@ -96,7 +114,7 @@ holdout, and the recurrent networks that are not carried forward. It showed no
 spatial downscaling, no mass conservation, no uncertainty decomposition and no
 daily disaggregation. There was nothing in it to restyle.
 
-The plate deliberately names feature *families* rather than window lengths or a
+The figure deliberately names feature *families* rather than window lengths or a
 column count. The design matrix changed twice during the revision; the numbers
 belong in METHODS.md and the released ablation table, where a reader can check
 them against something.
@@ -144,7 +162,7 @@ and its neighbours were withheld.
 It exists because the Results section promised "the complete fold-wise spatial
 distribution of RMSE, R², NSE and bias" and pointed at `mascon_metric_maps.png`,
 which is the **well** comparison redrawn at mascon scale and covers only the 10
-of 19 mascons holding enough CGWB wells to score. Both plates are kept — they
+of 19 mascons holding enough CGWB wells to score. Both figures are kept — they
 answer different questions — and the supplement now labels each for what it is.
 
 Bias is not in `lomo_cv_<model>.csv`; its PBIAS column is empty, because a
@@ -161,13 +179,13 @@ colour.
 
 ### Figure 6 — seasonal cycle (`make_fig6_seasonal_cycle.py`)
 
-The two plates the manuscript sets one above the other under a single caption,
+The two images the manuscript sets one above the other under a single caption,
 stacked into the one file the journal takes: the basin-mean annual cycle from
 `main/downscale_annual_cycle.py` above, the 0.1° seasonal means from
 `main/generate_gridded_maps.py` below. Nothing is redrawn — the script pastes the
-rendered PNGs, resampling the lower plate by 4% to the upper one's width so the
+rendered PNGs, resampling the lower image by 4% to the upper one's width so the
 two share edges — which keeps Fig. 6 pixel for pixel what the pipeline writes.
-It reads `Results/`, not downloads, and refuses to run if either plate is missing
+It reads `Results/`, not downloads, and refuses to run if either image is missing
 or the two are at different DPI.
 
 ### Graphical abstract (`make_graphical_abstract.py`)
@@ -242,7 +260,7 @@ this file.** It needs Pillow; if Pillow is not importable the script prints a
 notice, skips the preview and still writes both real outputs.
 
 At thumbnail size the headline, the four numbers, their labels, the panel titles
-and the footnote all hold up. Getting there meant cutting the plate back: the
+and the footnote all hold up. Getting there meant cutting the figure back: the
 per-fact method captions and the redundant mascons-to-cells sentence were dropped,
 the footnote was reduced to one line, and nothing is now set below 10 pt. That is
 the reason the content is four panels rather than six.
@@ -273,7 +291,7 @@ sits between the two — four rasterised map panels, everything else vector. All
 PDFs use Type 42 fonts so the text stays selectable and editable at the journal.
 
 Fig 2 is sized at 240 mm rather than a single- or double-column width on purpose:
-the type was set first (7 pt detail, 8 pt headings) and the plate made large
+the type was set first (7 pt detail, 8 pt headings) and the figure made large
 enough to hold it, because a reviewer meets it on screen. It will need scaling to
 the journal's column width at typesetting.
 
@@ -297,7 +315,7 @@ Figures 3, 5, 6 and 10 read results rather than downloads, so they run only afte
 `main/run_full_pipeline.sh` has produced
 `Results/downscaling/twsa_0p1deg_monthly_xgboost.nc`,
 `twsa_trend_significance.nc` and `trend_by_region.csv` — and, for Fig. 6, the
-two plates it stacks. None invents a number: `make_fig3_holdouts.py` re-runs the
+two images it stacks. None invents a number: `make_fig3_holdouts.py` re-runs the
 seeded month selection from `downscale_holdouts.py` against the released
 observation flag, and
 `make_fig10_trend_regions.py` calls `trend_regions.summarise()` and
@@ -398,28 +416,10 @@ yes/no, use the exit code of `git check-ignore -q <path>` instead.
 
 ---
 
-## Captions
+## Citation
 
-The captions live in the manuscript and only there. What this file has to record
-is narrower, and it is the thing a reader of the repository alone cannot see:
-**Figure 1 is deliberately incomplete.** Four attributions were moved off the
-plate to keep it readable, they are not recoverable from the image, and they are
-not optional:
-
-* HydroSHEDS, for the terrain and river network — HydroRIVERS v1.0 and the
-  15-arcsecond void-filled DEM (Lehner & Grill, 2013);
-* the Government of India river network (data.gov.in), for the reach named
-  "Ganga" that the main channel follows;
-* Kuruva et al. (2025), for the 656 CGWB monitoring wells;
-* the **Survey of India** outline, which is the statement that the boundary
-  shown is the official one — see [the boundary requirement](#the-boundary-requirement).
-
-No other plate carries a third-party attribution: Figure 2 is drawn from nothing
-external, and Figures 3, 5, 6 and 10 are drawn from the archived result files.
-
-A second copy of the captions used to live at `output/FIGURE_CAPTIONS.md`. It was
-removed because it drifted: it described Figure 2's colour key backwards — saying
-filled boxes were the fitted steps, when the filled boxes are the constraints and
-are precisely the steps where nothing is fitted — and that error reached the
-submitted manuscript before it was caught. The requirement is worth recording;
-a duplicate of the captions is not.
+Kaushik, P. R., Majumdar, S., Lenczuk, A., Sharma, Y. K., Banerjee, S., &
+Thakur, P. K. (2026). Explainable AI-Based Spatial Downscaling and Water
+Balance-Guided Temporal Disaggregation of GRACE Terrestrial Water Storage
+Anomalies over the Ganges River Basin. *Groundwater for Sustainable
+Development*, 101688. https://doi.org/10.1016/j.gsd.2026.101688
